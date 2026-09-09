@@ -230,6 +230,13 @@ dotnet_diagnostic.S2479.severity = none
 
 # SA1011: Closing square bracket should be followed by a space.
 dotnet_diagnostic.SA1011.severity = none
+
+# SA1009/SA1106/SA1516: StyleCop.Analyzers 1.1.118 predates C# 12 primary constructors combined
+# with a base type/interface list and misreports on that syntax. (SA1500/SA1502/SA1508 crash on
+# the same syntax and raise AD0001 instead; that one isn't configurable here, see <NoWarn>.)
+dotnet_diagnostic.SA1009.severity = none
+dotnet_diagnostic.SA1106.severity = none
+dotnet_diagnostic.SA1516.severity = none
 csharp_style_namespace_declarations = file_scoped:suggestion
 csharp_style_prefer_null_check_over_type_check = true:suggestion
 csharp_style_prefer_local_over_anonymous_function = true:suggestion
