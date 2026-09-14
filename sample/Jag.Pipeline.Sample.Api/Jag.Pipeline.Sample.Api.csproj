@@ -23,4 +23,8 @@
     <ProjectReference Include="..\..\src\Jag.Pipeline\Jag.Pipeline.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Services\" />
+  </ItemGroup>
+
 </Project>

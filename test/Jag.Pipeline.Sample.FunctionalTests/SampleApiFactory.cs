@@ -1,3 +1,4 @@
+using Jag.Pipeline.Sample.Api;
 using Jag.Pipeline.Sample.Api.Data;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;

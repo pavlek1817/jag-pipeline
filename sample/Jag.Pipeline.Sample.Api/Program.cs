@@ -1,8 +1,8 @@
 using Jag.Pipeline.Sample.Api.Data;
 using Jag.Pipeline.Sample.Api.Exceptions;
 using Jag.Pipeline.Sample.Api.Models;
+using Jag.Pipeline.Sample.Api.Pipeline.Services;
 using Jag.Pipeline.Sample.Api.Registration;
-using Jag.Pipeline.Sample.Api.Services;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -59,5 +59,8 @@ app.MapGet("/students", (IStudentService studentService, CancellationToken ct) =
 
 app.Run();
 
-/// <summary>Exposed as a partial class so <c>WebApplicationFactory&lt;Program&gt;</c> can target it from tests.</summary>
-public partial class Program;
+namespace Jag.Pipeline.Sample.Api
+{
+    /// <summary>Exposed as a partial class so <c>WebApplicationFactory&lt;Program&gt;</c> can target it from tests.</summary>
+    public partial class Program;
+}
