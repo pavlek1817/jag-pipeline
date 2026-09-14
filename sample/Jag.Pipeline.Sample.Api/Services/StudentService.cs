@@ -30,7 +30,7 @@ public sealed class StudentService(SampleDbContext dbContext, TimeProvider timeP
             errors.Add("Identification number is required.");
         }
 
-        if (request.ProgramId == Guid.Empty)
+        if (string.IsNullOrWhiteSpace(request.ProgramId))
         {
             errors.Add("Program id is required.");
         }
@@ -60,7 +60,7 @@ public sealed class StudentService(SampleDbContext dbContext, TimeProvider timeP
         var request = model.Request;
         var student = new Student
         {
-            Id = Guid.NewGuid(),
+            Id = Guid.NewGuid().ToString(),
             FirstName = request.FirstName,
             LastName = request.LastName,
             IdentificationNumber = request.IdentificationNumber,

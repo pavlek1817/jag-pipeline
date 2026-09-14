@@ -11,5 +11,5 @@ public sealed class StudentAddModel
 
     public string IdentificationNumber { get; set; } = string.Empty;
 
-    public Guid ProgramId { get; set; }
+    public string ProgramId { get; set; } = string.Empty;
 }

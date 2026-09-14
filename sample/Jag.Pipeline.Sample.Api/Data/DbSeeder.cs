@@ -15,16 +15,16 @@ public static class DbSeeder
             return;
         }
 
-        var computerScience = new AcademicProgram { Id = Guid.NewGuid(), Code = "CS101", Name = "Computer Science" };
-        var businessAdministration = new AcademicProgram { Id = Guid.NewGuid(), Code = "BA101", Name = "Business Administration" };
-        var mechanicalEngineering = new AcademicProgram { Id = Guid.NewGuid(), Code = "ME101", Name = "Mechanical Engineering" };
+        var computerScience = new AcademicProgram { Id = Guid.NewGuid().ToString(), Code = "CS101", Name = "Computer Science" };
+        var businessAdministration = new AcademicProgram { Id = Guid.NewGuid().ToString(), Code = "BA101", Name = "Business Administration" };
+        var mechanicalEngineering = new AcademicProgram { Id = Guid.NewGuid().ToString(), Code = "ME101", Name = "Mechanical Engineering" };
 
         dbContext.Programs.AddRange(computerScience, businessAdministration, mechanicalEngineering);
 
         dbContext.Students.AddRange(
             new Student
             {
-                Id = Guid.NewGuid(),
+                Id = Guid.NewGuid().ToString(),
                 FirstName = "Ana",
                 LastName = "Kovač",
                 IdentificationNumber = "STU-0001",
@@ -35,7 +35,7 @@ public static class DbSeeder
             },
             new Student
             {
-                Id = Guid.NewGuid(),
+                Id = Guid.NewGuid().ToString(),
                 FirstName = "Marko",
                 LastName = "Horvat",
                 IdentificationNumber = "STU-0002",

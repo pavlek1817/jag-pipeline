@@ -5,7 +5,7 @@ namespace Jag.Pipeline.Sample.Api.Domain;
 /// </summary>
 public sealed class Student
 {
-    public Guid Id { get; set; }
+    public string Id { get; set; } = string.Empty;
 
     public string FirstName { get; set; } = string.Empty;
 
@@ -13,7 +13,7 @@ public sealed class Student
 
     public string IdentificationNumber { get; set; } = string.Empty;
 
-    public Guid ProgramId { get; set; }
+    public string ProgramId { get; set; } = string.Empty;
 
     public StudentStatus Status { get; set; }
 

@@ -14,7 +14,7 @@ public sealed class StudentRegistrationContext(StudentAddModel request)
 
     public Student? Student { get; set; }
 
-    public Guid? ChargeId { get; set; }
+    public string? ChargeId { get; set; }
 
     public StudentGetModel? Response { get; set; }
 }

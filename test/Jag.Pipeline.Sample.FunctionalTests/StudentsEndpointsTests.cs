@@ -80,7 +80,7 @@ internal sealed class StudentsEndpointsTests
             FirstName = "Ivana",
             LastName = "Novak",
             IdentificationNumber = $"STU-{Guid.NewGuid():N}",
-            ProgramId = Guid.NewGuid(),
+            ProgramId = Guid.NewGuid().ToString(),
         };
 
         // Act
@@ -126,7 +126,7 @@ internal sealed class StudentsEndpointsTests
         students.Should().Contain(s => s.IdentificationNumber == request.IdentificationNumber);
     }
 
-    private async Task<Guid> getSeededProgramIdAsync()
+    private async Task<string> getSeededProgramIdAsync()
     {
         using var scope = this.factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<SampleDbContext>();
