@@ -13,8 +13,10 @@
         <PackageId>Jag.Pipeline</PackageId>
         <Version>0.1.0</Version>
         <Authors>Mario Pavlović</Authors>
-        <Description>A compensable pipeline for .NET, built on TPL Dataflow: thread a model through ordered steps, auto-compensating completed steps in reverse order on failure.</Description>
+        <Description>A compensable pipeline for .NET, built on TPL Dataflow: thread a model through ordered steps, auto-compensating completed steps in reverse order on failure. Every step shares the same model-and-cancellation-token contract, so the resulting code is much more readable and the business flow is easier to follow at a glance.</Description>
+        <PackageTags>pipeline;compensable-pipeline;saga;orchestration;dataflow;tpl-dataflow;rollback;compensation;dotnet</PackageTags>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
         <RepositoryUrl>https://github.com/pavlek1817/jag-pipeline</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
     </PropertyGroup>
@@ -24,6 +26,10 @@
         <PrivateAssets>all</PrivateAssets>
         <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       </PackageReference>
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Include="..\..\README.md" Pack="true" PackagePath="\" />
     </ItemGroup>
 
 </Project>
