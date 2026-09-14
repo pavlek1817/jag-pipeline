@@ -1,3 +1,5 @@
+using Jag.Pipeline.Sample.Api.Registration;
+
 namespace Jag.Pipeline.Sample.Api.Services;
 
 /// <summary>
@@ -5,8 +7,8 @@ namespace Jag.Pipeline.Sample.Api.Services;
 /// </summary>
 public interface IPaymentService
 {
-    /// <returns>An id identifying the charge, to pass back into <see cref="RevertChargeAsync"/> on compensation.</returns>
-    Task<Guid> ChargeAsync(Guid studentId, decimal amount, CancellationToken ct);
+    /// <summary>Charges the student, recording the raised charge id on the context for <see cref="RevertChargeAsync"/> to use on compensation.</summary>
+    Task<StudentRegistrationContext> ChargeAsync(StudentRegistrationContext model, CancellationToken ct);
 
-    Task RevertChargeAsync(Guid chargeId, CancellationToken ct);
+    Task<StudentRegistrationContext> RevertChargeAsync(StudentRegistrationContext model, CancellationToken ct);
 }

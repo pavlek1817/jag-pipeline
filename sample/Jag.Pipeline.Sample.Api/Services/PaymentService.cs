@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Jag.Pipeline.Sample.Api.Registration;
 
 namespace Jag.Pipeline.Sample.Api.Services;
 
@@ -8,18 +9,23 @@ namespace Jag.Pipeline.Sample.Api.Services;
 /// </summary>
 public sealed class PaymentService : IPaymentService
 {
+    private const decimal RegistrationFee = 100m;
+
     private readonly ConcurrentDictionary<Guid, (Guid StudentId, decimal Amount)> ledger = new ();
 
-    public Task<Guid> ChargeAsync(Guid studentId, decimal amount, CancellationToken ct)
+    public Task<StudentRegistrationContext> ChargeAsync(StudentRegistrationContext model, CancellationToken ct)
     {
         var chargeId = Guid.NewGuid();
-        this.ledger[chargeId] = (studentId, amount);
-        return Task.FromResult(chargeId);
+        this.ledger[chargeId] = (model.Student!.Id, RegistrationFee);
+
+        model.ChargeId = chargeId;
+        return Task.FromResult(model);
     }
 
-    public Task RevertChargeAsync(Guid chargeId, CancellationToken ct)
+    public Task<StudentRegistrationContext> RevertChargeAsync(StudentRegistrationContext model, CancellationToken ct)
     {
-        this.ledger.TryRemove(chargeId, out _);
-        return Task.CompletedTask;
+        this.ledger.TryRemove(model.ChargeId!.Value, out _);
+
+        return Task.FromResult(model);
     }
 }

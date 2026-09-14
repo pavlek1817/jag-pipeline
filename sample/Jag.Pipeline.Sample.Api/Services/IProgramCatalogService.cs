@@ -1,3 +1,5 @@
+using Jag.Pipeline.Sample.Api.Registration;
+
 namespace Jag.Pipeline.Sample.Api.Services;
 
 /// <summary>
@@ -6,5 +8,5 @@ namespace Jag.Pipeline.Sample.Api.Services;
 public interface IProgramCatalogService
 {
     /// <exception cref="Exceptions.ProgramNotFoundException">The program does not exist.</exception>
-    Task EnsureProgramExistsAsync(Guid programId, CancellationToken ct);
+    Task<StudentRegistrationContext> EnsureProgramExistsAsync(StudentRegistrationContext model, CancellationToken ct);
 }
