@@ -1,7 +1,7 @@
 using Jag.Pipeline.Abstractions;
 using Jag.Pipeline.Core;
 using Jag.Pipeline.Sample.Api.Models;
-using Jag.Pipeline.Sample.Api.Services;
+using Jag.Pipeline.Sample.Api.Pipeline.Services;
 
 namespace Jag.Pipeline.Sample.Api.Registration;
 
@@ -17,30 +17,51 @@ namespace Jag.Pipeline.Sample.Api.Registration;
 /// 8. Shape the response.
 /// If any step fails, steps 4 and 5 (if reached) are compensated in reverse order before the
 /// original exception is re-thrown, so a failed registration leaves no trace.
-/// Every step shares the same <see cref="StudentRegistrationContext"/> and
+/// Every step shares the same <see cref="StudentRegistrationPipelineModel"/> and
 /// <see cref="CancellationToken"/> contract, so the pipeline definition below is just a list of
 /// method references.
 /// </summary>
-public sealed class StudentRegistrationHandler(
-    IStudentService studentService,
-    IProgramCatalogService programCatalogService,
-    IPaymentService paymentService)
+public sealed class StudentRegistrationHandler
 {
+    private IPipeline<StudentRegistrationPipelineModel> studentRegistrationPipeline;
+
+    private readonly IStudentService studentService;
+    private readonly IProgramCatalogService programCatalogService;
+    private readonly IPaymentService paymentService;
+
+    public StudentRegistrationHandler(
+        IStudentService studentService,
+        IProgramCatalogService programCatalogService,
+        IPaymentService paymentService)
+    {
+        this.studentService = studentService;
+        this.programCatalogService = programCatalogService;
+        this.paymentService = paymentService;
+        this.studentRegistrationPipeline = this.buildPipeline();
+    }
+
     public async Task<StudentGetModel> RegisterAsync(StudentAddModel request, CancellationToken ct)
     {
-        var pipeline = new Pipeline<StudentRegistrationContext>()
-            .AddStep(studentService.ValidateRequestAsync)
-            .AddStep(studentService.EnsureIdentificationNumberIsUniqueAsync)
-            .AddStep(programCatalogService.EnsureProgramExistsAsync)
-            .AddCompensableStep(studentService.AddPendingAsync, studentService.RemovePendingAsync)
-            .AddCompensableStep(paymentService.ChargeAsync, paymentService.RevertChargeAsync)
-            .AddStep(studentService.CompleteRegistrationAsync)
-            .AddStep(studentService.SaveChangesAsync)
-            .AddStep(studentService.ShapeResponseAsync)
-            .CreatePipeline();
+        var registrationModel = new StudentRegistrationPipelineModel(
+            request.FirstName,
+            request.LastName,
+            request.IdentificationNumber,
+            request.ProgramId);
 
-        var context = new StudentRegistrationContext(request);
-        var result = await pipeline.ExecuteAsync(context, ct);
+        var result = await this.studentRegistrationPipeline.ExecuteAsync(registrationModel, ct);
+
         return result.Response!;
     }
+
+    private IPipeline<StudentRegistrationPipelineModel> buildPipeline()
+        => new Pipeline<StudentRegistrationPipelineModel>()
+            .AddStep(this.studentService.ValidateRequestAsync)
+            .AddStep(this.studentService.EnsureIdentificationNumberIsUniqueAsync)
+            .AddStep(this.programCatalogService.EnsureProgramExistsAsync)
+            .AddCompensableStep(this.studentService.AddPendingAsync, this.studentService.RemovePendingAsync)
+            .AddCompensableStep(this.paymentService.ChargeAsync, this.paymentService.RevertChargeAsync)
+            .AddStep(this.studentService.CompleteRegistrationAsync)
+            .AddStep(this.studentService.SaveChangesAsync)
+            .AddStep(this.studentService.ShapeResponseAsync)
+            .CreatePipeline();
 }

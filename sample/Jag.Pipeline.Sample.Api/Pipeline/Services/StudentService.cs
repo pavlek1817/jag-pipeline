@@ -3,34 +3,34 @@ using Jag.Pipeline.Sample.Api.Domain;
 using Jag.Pipeline.Sample.Api.Exceptions;
 using Jag.Pipeline.Sample.Api.Mapping;
 using Jag.Pipeline.Sample.Api.Models;
+using Jag.Pipeline.Sample.Api.Pipeline.Contracts;
 using Jag.Pipeline.Sample.Api.Registration;
 using Microsoft.EntityFrameworkCore;
 
-namespace Jag.Pipeline.Sample.Api.Services;
+namespace Jag.Pipeline.Sample.Api.Pipeline.Services;
 
 public sealed class StudentService(SampleDbContext dbContext, TimeProvider timeProvider) : IStudentService
 {
-    public Task<StudentRegistrationContext> ValidateRequestAsync(StudentRegistrationContext model, CancellationToken ct)
+    public Task<StudentRegistrationPipelineModel> ValidateRequestAsync(StudentRegistrationPipelineModel model, CancellationToken ct)
     {
         var errors = new List<string>();
-        var request = model.Request;
 
-        if (string.IsNullOrWhiteSpace(request.FirstName))
+        if (string.IsNullOrWhiteSpace(model.FirstName))
         {
             errors.Add("First name is required.");
         }
 
-        if (string.IsNullOrWhiteSpace(request.LastName))
+        if (string.IsNullOrWhiteSpace(model.LastName))
         {
             errors.Add("Last name is required.");
         }
 
-        if (string.IsNullOrWhiteSpace(request.IdentificationNumber))
+        if (string.IsNullOrWhiteSpace(model.IdentificationNumber))
         {
             errors.Add("Identification number is required.");
         }
 
-        if (string.IsNullOrWhiteSpace(request.ProgramId))
+        if (string.IsNullOrWhiteSpace(model.ProgramId))
         {
             errors.Add("Program id is required.");
         }
@@ -43,9 +43,9 @@ public sealed class StudentService(SampleDbContext dbContext, TimeProvider timeP
         return Task.FromResult(model);
     }
 
-    public async Task<StudentRegistrationContext> EnsureIdentificationNumberIsUniqueAsync(StudentRegistrationContext model, CancellationToken ct)
+    public async Task<IIdentificationNumber> EnsureIdentificationNumberIsUniqueAsync(IIdentificationNumber model, CancellationToken ct)
     {
-        var identificationNumber = model.Request.IdentificationNumber;
+        var identificationNumber = model.IdentificationNumber;
         var exists = await dbContext.Students.AnyAsync(s => s.IdentificationNumber == identificationNumber, ct);
         if (exists)
         {
@@ -55,16 +55,15 @@ public sealed class StudentService(SampleDbContext dbContext, TimeProvider timeP
         return model;
     }
 
-    public async Task<StudentRegistrationContext> AddPendingAsync(StudentRegistrationContext model, CancellationToken ct)
+    public async Task<StudentRegistrationPipelineModel> AddPendingAsync(StudentRegistrationPipelineModel model, CancellationToken ct)
     {
-        var request = model.Request;
         var student = new Student
         {
             Id = Guid.NewGuid().ToString(),
-            FirstName = request.FirstName,
-            LastName = request.LastName,
-            IdentificationNumber = request.IdentificationNumber,
-            ProgramId = request.ProgramId,
+            FirstName = model.FirstName,
+            LastName = model.LastName,
+            IdentificationNumber = model.IdentificationNumber,
+            ProgramId = model.ProgramId,
             Status = StudentStatus.Pending,
             IsCharged = false,
             NextChargeDate = null,
@@ -77,7 +76,7 @@ public sealed class StudentService(SampleDbContext dbContext, TimeProvider timeP
         return model;
     }
 
-    public async Task<StudentRegistrationContext> RemovePendingAsync(StudentRegistrationContext model, CancellationToken ct)
+    public async Task<StudentRegistrationPipelineModel> RemovePendingAsync(StudentRegistrationPipelineModel model, CancellationToken ct)
     {
         dbContext.Students.Remove(model.Student!);
         await dbContext.SaveChangesAsync(ct);
@@ -85,7 +84,7 @@ public sealed class StudentService(SampleDbContext dbContext, TimeProvider timeP
         return model;
     }
 
-    public Task<StudentRegistrationContext> CompleteRegistrationAsync(StudentRegistrationContext model, CancellationToken ct)
+    public Task<StudentRegistrationPipelineModel> CompleteRegistrationAsync(StudentRegistrationPipelineModel model, CancellationToken ct)
     {
         var student = model.Student!;
         student.Status = StudentStatus.Active;
@@ -95,14 +94,14 @@ public sealed class StudentService(SampleDbContext dbContext, TimeProvider timeP
         return Task.FromResult(model);
     }
 
-    public async Task<StudentRegistrationContext> SaveChangesAsync(StudentRegistrationContext model, CancellationToken ct)
+    public async Task<StudentRegistrationPipelineModel> SaveChangesAsync(StudentRegistrationPipelineModel model, CancellationToken ct)
     {
         await dbContext.SaveChangesAsync(ct);
 
         return model;
     }
 
-    public Task<StudentRegistrationContext> ShapeResponseAsync(StudentRegistrationContext model, CancellationToken ct)
+    public Task<StudentRegistrationPipelineModel> ShapeResponseAsync(StudentRegistrationPipelineModel model, CancellationToken ct)
     {
         model.Response = StudentMapper.ToGetModel(model.Student!);
 

@@ -1,7 +1,7 @@
+using Jag.Pipeline.Sample.Api.Pipeline.Contracts;
 using System.Collections.Concurrent;
-using Jag.Pipeline.Sample.Api.Registration;
 
-namespace Jag.Pipeline.Sample.Api.Services;
+namespace Jag.Pipeline.Sample.Api.Pipeline.Services;
 
 /// <summary>
 /// Simulates a payment gateway with a simple in-memory charge ledger, so a charge made by
@@ -13,7 +13,7 @@ public sealed class PaymentService : IPaymentService
 
     private readonly ConcurrentDictionary<string, (string StudentId, decimal Amount)> ledger = new ();
 
-    public Task<StudentRegistrationContext> ChargeAsync(StudentRegistrationContext model, CancellationToken ct)
+    public Task<IChargeModel> ChargeAsync(IChargeModel model, CancellationToken ct)
     {
         var chargeId = Guid.NewGuid().ToString();
         this.ledger[chargeId] = (model.Student!.Id, RegistrationFee);
@@ -22,7 +22,7 @@ public sealed class PaymentService : IPaymentService
         return Task.FromResult(model);
     }
 
-    public Task<StudentRegistrationContext> RevertChargeAsync(StudentRegistrationContext model, CancellationToken ct)
+    public Task<IRevertChargeModel> RevertChargeAsync(IRevertChargeModel model, CancellationToken ct)
     {
         this.ledger.TryRemove(model.ChargeId!, out _);
 
