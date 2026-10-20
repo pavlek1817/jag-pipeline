@@ -1,6 +1,6 @@
 # @jag-pipeline/core
 
-A small, dependency-free compensable pipeline for TypeScript — the TypeScript port of [Jag.Pipeline](../csharp). Instead of hand-rolling try/catch blocks and manual rollback code for a multi-step process, you declare the steps once and the pipeline runs them in order, compensating (rolling back) whatever already succeeded if a later step fails.
+A small, dependency-free compensable pipeline for TypeScript — the TypeScript port of [Jag.Pipeline](https://github.com/pavlek1817/jag-pipeline/tree/main/csharp). Instead of hand-rolling try/catch blocks and manual rollback code for a multi-step process, you declare the steps once and the pipeline runs them in order, compensating (rolling back) whatever already succeeded if a later step fails.
 
 ## The idea
 
