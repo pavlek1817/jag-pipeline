@@ -1,4 +1,4 @@
-# @jag-pipeline/core
+# @jagpav/pipeline
 
 A small, dependency-free compensable pipeline for TypeScript — the TypeScript port of [Jag.Pipeline](https://github.com/pavlek1817/jag-pipeline/tree/main/csharp). Instead of hand-rolling try/catch blocks and manual rollback code for a multi-step process, you declare the steps once and the pipeline runs them in order, compensating (rolling back) whatever already succeeded if a later step fails.
 
@@ -13,7 +13,7 @@ type PipelineStep<TModel> = (model: TModel, signal: AbortSignal) => Promise<unkn
 Because every step takes the same shared model and the same `AbortSignal`, a pipeline definition becomes a flat, readable list of step references:
 
 ```ts
-import { Pipeline } from '@jag-pipeline/core'
+import { Pipeline } from '@jagpav/pipeline'
 
 const pipeline = new Pipeline<StudentRegistrationModel>()
   .addStep(studentService.validateRequest)

@@ -1,5 +1,5 @@
 {
-  "name": "@jag-pipeline/core",
+  "name": "@jagpav/pipeline",
   "version": "1.0.0",
   "description": "A compensable pipeline for TypeScript: thread a model through ordered steps, auto-compensating completed steps in reverse order on failure.",
   "author": "Mario Pavlović",

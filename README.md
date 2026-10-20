@@ -9,7 +9,7 @@ Every step shares one contract — the shared model plus a cancellation primitiv
 | Folder | Package | Docs |
 | --- | --- | --- |
 | [`csharp/`](csharp) | NuGet: `Jag.Pipeline` | [csharp/README.md](csharp/README.md) |
-| [`ts/`](ts) | npm: `@jag-pipeline/core` | [ts/README.md](ts/README.md) |
+| [`ts/`](ts) | npm: `@jagpav/pipeline` | [ts/README.md](ts/README.md) |
 
 ## Repository layout
 
