@@ -45,12 +45,21 @@ export class Pipeline<TModel> {
   private readonly steps: StepDefinition<TModel>[] = []
   private failureHandler?: PipelineFailureHandler<TModel>
 
-  public addStep(execute: PipelineStep<TModel>) {
-    return this.addCompensableStep(execute)
+  /**
+   * Registers a step with no compensation.
+   * @param step The step to run
+   */
+  public addStep(step: PipelineStep<TModel>) {
+    return this.addCompensableStep(step)
   }
 
-  public addCompensableStep(execute: PipelineStep<TModel>, compensate?: PipelineStep<TModel>) {
-    this.steps.push({ execute, compensate })
+  /**
+   * Registers a step paired with a compensating action that runs if a later step fails.
+   * @param step The step to run
+   * @param compensate Undoes the step; omit it to skip compensation
+   */
+  public addCompensableStep(step: PipelineStep<TModel>, compensate?: PipelineStep<TModel>) {
+    this.steps.push({ execute: step, compensate })
     return this
   }
 
