@@ -65,6 +65,113 @@ internal sealed class PipelineTests : TestBase
         student.NameLength.Should().Be(0);
     }
 
+    // --- OnFailure ---
+    [Test]
+    public async Task ExecuteAsync_StepFailsWithOnFailureCase_ShouldRunOnFailureAfterCompensationAndRethrow()
+    {
+        // Arrange
+        var student = new StudentModel { Name = "Alice", Age = 20 };
+        var error = new InvalidOperationException("step 2 failed");
+        var calls = new List<string>();
+        Exception? receivedError = null;
+        var pipeline = new Pipeline<StudentModel>()
+            .AddCompensableStep(addYear, (m, ct) =>
+            {
+                calls.Add("compensate");
+                return subtractYear(m, ct);
+            })
+            .AddStep((_, _) => throw error)
+            .OnFailure((m, ex, _) =>
+            {
+                calls.Add($"onFailure age={m.Age}");
+                receivedError = ex;
+                return Task.CompletedTask;
+            })
+            .CreatePipeline();
+
+        // Act
+        var thrown = await pipeline
+            .Invoking(p => p.ExecuteAsync(student))
+            .Should().ThrowAsync<InvalidOperationException>();
+
+        // Assert — compensation ran first, then OnFailure got the original error, which still reached the caller
+        thrown.Which.Should().BeSameAs(error);
+        receivedError.Should().BeSameAs(error);
+        calls.Should().Equal("compensate", "onFailure age=20");
+    }
+
+    [Test]
+    public async Task ExecuteAsync_AllStepsSucceedWithOnFailure_ShouldNotRunOnFailure()
+    {
+        // Arrange
+        var onFailureCalled = false;
+        var pipeline = new Pipeline<StudentModel>()
+            .AddStep(addYear)
+            .OnFailure((_, _, _) =>
+            {
+                onFailureCalled = true;
+                return Task.CompletedTask;
+            })
+            .CreatePipeline();
+
+        // Act
+        await pipeline.ExecuteAsync(new StudentModel { Name = "Alice", Age = 20 });
+
+        // Assert
+        onFailureCalled.Should().BeFalse();
+    }
+
+    [Test]
+    public async Task ExecuteAsync_OnFailureThrowsCase_ShouldRethrowOriginalAndKeepOnFailureError()
+    {
+        // Arrange
+        var error = new InvalidOperationException("step failed");
+        var onFailureError = new InvalidOperationException("onFailure failed");
+        var pipeline = new Pipeline<StudentModel>()
+            .AddStep((_, _) => throw error)
+            .OnFailure((_, _, _) => throw onFailureError)
+            .CreatePipeline();
+
+        // Act
+        var task = pipeline.ExecuteAsync(new StudentModel { Name = "Alice", Age = 20 });
+        var thrown = await task
+            .Invoking(t => t)
+            .Should().ThrowAsync<InvalidOperationException>();
+
+        // Assert
+        thrown.Which.Should().BeSameAs(error);
+        task.Exception!.InnerExceptions.Should().Equal(error, onFailureError);
+    }
+
+    [Test]
+    public async Task ExecuteAsync_CompensationThrowsCase_ShouldStillRunOnFailureAndRethrowOriginal()
+    {
+        // Arrange
+        var error = new InvalidOperationException("step 2 failed");
+        var compensationError = new InvalidOperationException("compensation failed");
+        var onFailureCalled = false;
+        var pipeline = new Pipeline<StudentModel>()
+            .AddCompensableStep(addYear, (_, _) => throw compensationError)
+            .AddStep((_, _) => throw error)
+            .OnFailure((_, _, _) =>
+            {
+                onFailureCalled = true;
+                return Task.CompletedTask;
+            })
+            .CreatePipeline();
+
+        // Act
+        var task = pipeline.ExecuteAsync(new StudentModel { Name = "Alice", Age = 20 });
+        var thrown = await task
+            .Invoking(t => t)
+            .Should().ThrowAsync<InvalidOperationException>();
+
+        // Assert
+        thrown.Which.Should().BeSameAs(error);
+        task.Exception!.InnerExceptions.Should().Equal(error, compensationError);
+        onFailureCalled.Should().BeTrue();
+    }
+
     // --- Guard clauses ---
     [Test]
     public void CreatePipeline_WithNoStepsCase_ShouldThrowInvalidOperationException()
@@ -113,6 +220,34 @@ internal sealed class PipelineTests : TestBase
         // Act & Assert
         pipeline
             .Invoking(p => p.AddStep(calculateNameLength))
+            .Should().Throw<InvalidOperationException>();
+    }
+
+    [Test]
+    public void OnFailure_CalledTwiceCase_ShouldThrowInvalidOperationException()
+    {
+        // Arrange
+        var pipeline = new Pipeline<StudentModel>()
+            .AddStep(addYear)
+            .OnFailure((_, _, _) => Task.CompletedTask);
+
+        // Act & Assert
+        pipeline
+            .Invoking(p => p.OnFailure((_, _, _) => Task.CompletedTask))
+            .Should().Throw<InvalidOperationException>();
+    }
+
+    [Test]
+    public void OnFailure_AfterCreatePipelineCase_ShouldThrowInvalidOperationException()
+    {
+        // Arrange
+        var pipeline = new Pipeline<StudentModel>()
+            .AddStep(addYear)
+            .CreatePipeline();
+
+        // Act & Assert
+        pipeline
+            .Invoking(p => p.OnFailure((_, _, _) => Task.CompletedTask))
             .Should().Throw<InvalidOperationException>();
     }
 

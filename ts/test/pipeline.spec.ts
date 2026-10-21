@@ -1,4 +1,4 @@
-import { Pipeline, PipelineCompensationError } from '../src'
+import { Pipeline, PipelineCompensationError, PipelineFailureHandlerError } from '../src'
 
 type StudentModel = {
   name: string
@@ -128,6 +128,89 @@ describe('Pipeline', () => {
     expect((thrown as PipelineCompensationError).error).toBe(error)
     expect((thrown as PipelineCompensationError).compensationErrors).toEqual([compensationError])
     expect(compensateFirst).toHaveBeenCalledTimes(1)
+  })
+
+  // --- OnFailure ---
+  it('execute_StepFailsWithOnFailureCase_ShouldRunOnFailureAfterCompensationAndRethrow', async () => {
+    // Arrange
+    const student = createStudent()
+    const error = new Error('step 2 failed')
+    const calls: string[] = []
+    const onFailure = jest.fn(async (model: StudentModel) => void calls.push(`onFailure age=${model.age}`))
+    const pipeline = new Pipeline<StudentModel>()
+      .addCompensableStep(addYear, async (model) => {
+        calls.push('compensate')
+        await subtractYear(model)
+      })
+      .addStep(async () => {
+        throw error
+      })
+      .onFailure(onFailure)
+
+    // Act & Assert
+    await expect(pipeline.execute(student)).rejects.toBe(error)
+    expect(calls).toEqual(['compensate', 'onFailure age=20'])
+    expect(onFailure).toHaveBeenCalledWith(student, error, expect.any(AbortSignal))
+  })
+
+  it('execute_AllStepsSucceedWithOnFailure_ShouldNotRunOnFailure', async () => {
+    // Arrange
+    const onFailure = jest.fn(async () => {})
+    const pipeline = new Pipeline<StudentModel>().addStep(addYear).onFailure(onFailure)
+
+    // Act
+    await pipeline.execute(createStudent())
+
+    // Assert
+    expect(onFailure).not.toHaveBeenCalled()
+  })
+
+  it('execute_OnFailureThrowsCase_ShouldThrowPipelineFailureHandlerError', async () => {
+    // Arrange
+    const error = new Error('step failed')
+    const failureHandlerError = new Error('onFailure failed')
+    const pipeline = new Pipeline<StudentModel>()
+      .addStep(async () => {
+        throw error
+      })
+      .onFailure(async () => {
+        throw failureHandlerError
+      })
+
+    // Act
+    const thrown = await pipeline.execute(createStudent()).catch((e: unknown) => e)
+
+    // Assert
+    expect(thrown).toBeInstanceOf(PipelineFailureHandlerError)
+    expect((thrown as PipelineFailureHandlerError).name).toBe('PipelineFailureHandlerError')
+    expect((thrown as PipelineFailureHandlerError).error).toBe(error)
+    expect((thrown as PipelineFailureHandlerError).failureHandlerError).toBe(failureHandlerError)
+  })
+
+  it('execute_CompensationThrowsWithOnFailureCase_ShouldRunOnFailureAndThrowPipelineCompensationError', async () => {
+    // Arrange
+    const error = new Error('step 2 failed')
+    const onFailure = jest.fn(async () => {})
+    const pipeline = new Pipeline<StudentModel>()
+      .addCompensableStep(async () => {}, async () => {
+        throw new Error('compensation failed')
+      })
+      .addStep(async () => {
+        throw error
+      })
+      .onFailure(onFailure)
+
+    // Act & Assert
+    await expect(pipeline.execute(createStudent())).rejects.toBeInstanceOf(PipelineCompensationError)
+    expect(onFailure).toHaveBeenCalledWith(expect.anything(), error, expect.any(AbortSignal))
+  })
+
+  it('onFailure_CalledTwiceCase_ShouldThrow', () => {
+    // Arrange
+    const pipeline = new Pipeline<StudentModel>().addStep(addYear).onFailure(async () => {})
+
+    // Act & Assert
+    expect(() => pipeline.onFailure(async () => {})).toThrow('onFailure() can only be called once')
   })
 
   // --- Cancellation ---

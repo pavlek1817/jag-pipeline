@@ -32,8 +32,10 @@ const result = await pipeline.execute(new StudentRegistrationModel(request), sig
 
 - **`addStep(execute)`** — registers a step with no compensation.
 - **`addCompensableStep(execute, compensate?)`** — registers a step alongside the action that undoes it if a *later* step fails.
-- **`execute(model, signal?)`** — runs the model through every step in order and resolves with the same model. The signal is checked before each step. On failure, already-completed compensable steps are compensated in reverse order, then the original error is re-thrown.
+- **`onFailure(handler)`** — registers one final action that runs when the pipeline fails, after the compensations and before the error reaches the caller. It receives the model, the error and the signal, e.g. to queue a retry or store a pending action. Can be called once.
+- **`execute(model, signal?)`** — runs the model through every step in order and resolves with the same model. The signal is checked before each step. On failure, already-completed compensable steps are compensated in reverse order, the `onFailure` handler runs, then the original error is re-thrown.
 - **`PipelineCompensationError`** — thrown instead of the original error when one or more compensations also failed. Exposes `error` (the original) and `compensationErrors`. Every compensation runs even if an earlier one fails.
+- **`PipelineFailureHandlerError`** — thrown when the `onFailure` handler itself fails. Exposes `error` (what the pipeline would otherwise have thrown) and `failureHandlerError`.
 
 ## Development
 

@@ -12,17 +12,14 @@ public sealed class Pipeline<TModel> : IPipeline<TModel>
     where TModel : class
 {
     private readonly List<StepDefinition<TModel>> steps = new List<StepDefinition<TModel>>();
+    private Func<TModel, Exception, CancellationToken, Task>? onFailureAsync;
     private ITargetBlock<PipelineContext<TModel>>? headBlock;
 
     public IPipeline<TModel> AddCompensableStep(
         Func<TModel, CancellationToken, Task> executeAsync,
         Func<TModel, CancellationToken, Task>? compensateAsync)
     {
-        if (this.headBlock is not null)
-        {
-            throw new InvalidOperationException("Steps cannot be added after CreatePipeline() has been called.");
-        }
-
+        this.ensureNotCreated();
         this.steps.Add(new StepDefinition<TModel>(executeAsync, compensateAsync));
         return this;
     }
@@ -30,6 +27,18 @@ public sealed class Pipeline<TModel> : IPipeline<TModel>
     public IPipeline<TModel> AddStep(Func<TModel, CancellationToken, Task> executeAsync)
     {
         return this.AddCompensableStep(executeAsync, null);
+    }
+
+    public IPipeline<TModel> OnFailure(Func<TModel, Exception, CancellationToken, Task> onFailureAsync)
+    {
+        this.ensureNotCreated();
+        if (this.onFailureAsync is not null)
+        {
+            throw new InvalidOperationException("OnFailure() can only be called once.");
+        }
+
+        this.onFailureAsync = onFailureAsync;
+        return this;
     }
 
     public IPipeline<TModel> CreatePipeline()
@@ -67,13 +76,37 @@ public sealed class Pipeline<TModel> : IPipeline<TModel>
                 }, blockOptions))
             .ToList();
 
+        var onFailureAsync = this.onFailureAsync;
         var finalBlock = new ActionBlock<PipelineContext<TModel>>(
             async ctx =>
             {
                 if (ctx.Error is not null)
                 {
-                    await compensateAllAsync(ctx.CompensateStack, ctx.Model, ctx.Ct);
-                    ctx.Tcs.SetException(ctx.Error);
+                    // The original exception goes first so it is the one awaiting callers see.
+                    var errors = new List<Exception> { ctx.Error };
+
+                    try
+                    {
+                        await compensateAllAsync(ctx.CompensateStack, ctx.Model, ctx.Ct);
+                    }
+                    catch (Exception ex)
+                    {
+                        errors.Add(ex);
+                    }
+
+                    if (onFailureAsync is not null)
+                    {
+                        try
+                        {
+                            await onFailureAsync(ctx.Model, ctx.Error, ctx.Ct);
+                        }
+                        catch (Exception ex)
+                        {
+                            errors.Add(ex);
+                        }
+                    }
+
+                    ctx.Tcs.SetException(errors);
                 }
                 else
                 {
@@ -113,6 +146,14 @@ public sealed class Pipeline<TModel> : IPipeline<TModel>
         while (compensateStack.Count > 0)
         {
             await compensateStack.Pop()(model, ct);
+        }
+    }
+
+    private void ensureNotCreated()
+    {
+        if (this.headBlock is not null)
+        {
+            throw new InvalidOperationException("The pipeline cannot be changed after CreatePipeline() has been called.");
         }
     }
 }

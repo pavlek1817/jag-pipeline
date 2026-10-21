@@ -24,6 +24,13 @@ public interface IPipeline<TModel>
     IPipeline<TModel> AddStep(Func<TModel, CancellationToken, Task> executeAsync);
 
     /// <summary>
+    /// Registers a final action that runs once when the pipeline fails, after the compensations and before
+    /// the original exception is re-thrown to the caller. Only one failure action can be registered.
+    /// </summary>
+    /// <param name="onFailureAsync">The action to run, given the model and the exception that failed the pipeline.</param>
+    IPipeline<TModel> OnFailure(Func<TModel, Exception, CancellationToken, Task> onFailureAsync);
+
+    /// <summary>
     /// Finalizes the pipeline configuration. Must be called before <see cref="ExecuteAsync"/>.
     /// No further steps may be added after this call.
     /// </summary>
@@ -31,7 +38,10 @@ public interface IPipeline<TModel>
 
     /// <summary>
     /// Runs the model through all registered steps in order.
-    /// On failure, compensates all completed steps in reverse order and re-throws the original exception.
+    /// On failure, compensates all completed steps in reverse order, runs the failure action registered with
+    /// <see cref="OnFailure"/>, and re-throws the original exception. If a compensation or the failure action
+    /// throws as well, the original exception is still the one re-thrown; the others are added to the returned task's
+    /// <see cref="Task.Exception"/>.
     /// </summary>
     /// <param name="model">The model to process.</param>
     /// <param name="ct">Cancellation token.</param>
