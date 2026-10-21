@@ -10,14 +10,24 @@ const createStudent = (): StudentModel => ({ name: 'Alice', age: 20, nameLength:
 
 const addYear = async (model: StudentModel) => {
   model.age++
+  return model
 }
 
 const subtractYear = async (model: StudentModel) => {
   model.age--
+  return model
 }
 
 const calculateNameLength = async (model: StudentModel) => {
   model.nameLength = model.name.length
+  return model
+}
+
+const doNothing = async (model: StudentModel) => model
+
+const record = (calls: string[], call: string) => async (model: StudentModel) => {
+  calls.push(call)
+  return model
 }
 
 describe('Pipeline', () => {
@@ -39,13 +49,22 @@ describe('Pipeline', () => {
     expect(result.nameLength).toBe(5)
   })
 
+  it('addStep_StepNotResolvingWithModelCase_ShouldNotCompile', () => {
+    // Arrange
+    const calls: string[] = []
+
+    // Act & Assert — the @ts-expect-error fails the build if a step resolving with nothing is ever accepted
+    // @ts-expect-error a step must resolve with the model
+    new Pipeline<StudentModel>().addStep(async () => void calls.push('first'))
+  })
+
   it('execute_MultipleSteps_ShouldRunStepsInOrder', async () => {
     // Arrange
     const calls: string[] = []
     const pipeline = new Pipeline<StudentModel>()
-      .addStep(async () => void calls.push('first'))
-      .addStep(async () => void calls.push('second'))
-      .addStep(async () => void calls.push('third'))
+      .addStep(record(calls, 'first'))
+      .addStep(record(calls, 'second'))
+      .addStep(record(calls, 'third'))
       .create()
 
     // Act
@@ -98,8 +117,8 @@ describe('Pipeline', () => {
     // Arrange
     const calls: string[] = []
     const pipeline = new Pipeline<StudentModel>()
-      .addCompensableStep(async () => {}, async () => void calls.push('compensate first'))
-      .addCompensableStep(async () => {}, async () => void calls.push('compensate second'))
+      .addCompensableStep(doNothing, record(calls, 'compensate first'))
+      .addCompensableStep(doNothing, record(calls, 'compensate second'))
       .addStep(async () => {
         throw new Error('step 3 failed')
       })
@@ -114,10 +133,10 @@ describe('Pipeline', () => {
     // Arrange
     const error = new Error('step 3 failed')
     const compensationError = new Error('compensation failed')
-    const compensateFirst = jest.fn(async () => {})
+    const compensateFirst = jest.fn(doNothing)
     const pipeline = new Pipeline<StudentModel>()
-      .addCompensableStep(async () => {}, compensateFirst)
-      .addCompensableStep(async () => {}, async () => {
+      .addCompensableStep(doNothing, compensateFirst)
+      .addCompensableStep(doNothing, async () => {
         throw compensationError
       })
       .addStep(async () => {
@@ -146,7 +165,7 @@ describe('Pipeline', () => {
     const pipeline = new Pipeline<StudentModel>()
       .addCompensableStep(addYear, async (model) => {
         calls.push('compensate')
-        await subtractYear(model)
+        return subtractYear(model)
       })
       .addStep(async () => {
         throw error
@@ -200,7 +219,7 @@ describe('Pipeline', () => {
     const error = new Error('step 2 failed')
     const onFailure = jest.fn(async () => {})
     const pipeline = new Pipeline<StudentModel>()
-      .addCompensableStep(async () => {}, async () => {
+      .addCompensableStep(doNothing, async () => {
         throw new Error('compensation failed')
       })
       .addStep(async () => {
@@ -288,7 +307,10 @@ describe('Pipeline', () => {
     const lastStep = jest.fn(calculateNameLength)
     const pipeline = new Pipeline<StudentModel>()
       .addCompensableStep(addYear, subtractYear)
-      .addStep(async () => controller.abort())
+      .addStep(async (model) => {
+        controller.abort()
+        return model
+      })
       .addStep(lastStep)
       .create()
 
@@ -301,7 +323,7 @@ describe('Pipeline', () => {
   it('execute_StepReceivesSignal_ShouldPassSameSignalToSteps', async () => {
     // Arrange
     const controller = new AbortController()
-    const step = jest.fn(async () => {})
+    const step = jest.fn(doNothing)
     const pipeline = new Pipeline<StudentModel>().addStep(step).create()
     const student = createStudent()
 

@@ -1,8 +1,9 @@
 /**
- * A step reads from and writes to the shared model. Declared as a function type (not a method signature)
- * so a step that needs fields the model does not have is a compile error.
+ * A step reads from and writes to the shared model and resolves with it. Declared as a function type (not a method
+ * signature) so a step that needs fields the model does not have, or resolves with anything but the model, is a
+ * compile error.
  */
-export type PipelineStep<TModel> = (model: TModel, signal: AbortSignal) => Promise<unknown>
+export type PipelineStep<TModel> = (model: TModel, signal: AbortSignal) => Promise<TModel>
 
 /**
  * A step failed and so did at least one of the compensations run for it.

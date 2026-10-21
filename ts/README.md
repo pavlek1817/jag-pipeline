@@ -7,10 +7,10 @@ A small, dependency-free compensable pipeline for TypeScript — the TypeScript 
 Every step shares **one contract**:
 
 ```ts
-type PipelineStep<TModel> = (model: TModel, signal: AbortSignal) => Promise<unknown>
+type PipelineStep<TModel> = (model: TModel, signal: AbortSignal) => Promise<TModel>
 ```
 
-Because every step takes the same shared model and the same `AbortSignal`, a pipeline definition becomes a flat, readable list of step references:
+Because every step takes the same shared model and the same `AbortSignal`, and resolves with that model, a pipeline definition becomes a flat, readable list of step references:
 
 ```ts
 import { Pipeline } from '@jagpav/pipeline'
