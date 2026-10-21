@@ -28,6 +28,7 @@ describe('Pipeline', () => {
     const pipeline = new Pipeline<StudentModel>()
       .addCompensableStep(addYear, subtractYear)
       .addStep(calculateNameLength)
+      .createPipeline()
 
     // Act
     const result = await pipeline.execute(student)
@@ -45,6 +46,7 @@ describe('Pipeline', () => {
       .addStep(async () => void calls.push('first'))
       .addStep(async () => void calls.push('second'))
       .addStep(async () => void calls.push('third'))
+      .createPipeline()
 
     // Act
     await pipeline.execute(createStudent())
@@ -63,6 +65,7 @@ describe('Pipeline', () => {
       .addStep(async () => {
         throw error
       })
+      .createPipeline()
 
     // Act & Assert
     await expect(pipeline.execute(student)).rejects.toBe(error)
@@ -80,6 +83,7 @@ describe('Pipeline', () => {
         throw new Error('step 1 failed')
       }, compensate)
       .addStep(calculateNameLength)
+      .createPipeline()
 
     // Act & Assert
     await expect(pipeline.execute(student)).rejects.toThrow('step 1 failed')
@@ -99,6 +103,7 @@ describe('Pipeline', () => {
       .addStep(async () => {
         throw new Error('step 3 failed')
       })
+      .createPipeline()
 
     // Act & Assert
     await expect(pipeline.execute(createStudent())).rejects.toThrow('step 3 failed')
@@ -118,6 +123,7 @@ describe('Pipeline', () => {
       .addStep(async () => {
         throw error
       })
+      .createPipeline()
 
     // Act
     const thrown = await pipeline.execute(createStudent()).catch((e: unknown) => e)
@@ -146,6 +152,7 @@ describe('Pipeline', () => {
         throw error
       })
       .onFailure(onFailure)
+      .createPipeline()
 
     // Act & Assert
     await expect(pipeline.execute(student)).rejects.toBe(error)
@@ -156,7 +163,7 @@ describe('Pipeline', () => {
   it('execute_AllStepsSucceedWithOnFailure_ShouldNotRunOnFailure', async () => {
     // Arrange
     const onFailure = jest.fn(async () => {})
-    const pipeline = new Pipeline<StudentModel>().addStep(addYear).onFailure(onFailure)
+    const pipeline = new Pipeline<StudentModel>().addStep(addYear).onFailure(onFailure).createPipeline()
 
     // Act
     await pipeline.execute(createStudent())
@@ -176,6 +183,7 @@ describe('Pipeline', () => {
       .onFailure(async () => {
         throw failureHandlerError
       })
+      .createPipeline()
 
     // Act
     const thrown = await pipeline.execute(createStudent()).catch((e: unknown) => e)
@@ -199,6 +207,7 @@ describe('Pipeline', () => {
         throw error
       })
       .onFailure(onFailure)
+      .createPipeline()
 
     // Act & Assert
     await expect(pipeline.execute(createStudent())).rejects.toBeInstanceOf(PipelineCompensationError)
@@ -213,13 +222,59 @@ describe('Pipeline', () => {
     expect(() => pipeline.onFailure(async () => {})).toThrow('onFailure() can only be called once')
   })
 
+  // --- Guard clauses ---
+  it('createPipeline_WithNoStepsCase_ShouldThrow', () => {
+    // Act & Assert
+    expect(() => new Pipeline<StudentModel>().createPipeline()).toThrow(
+      'At least one step must be added before calling createPipeline()',
+    )
+  })
+
+  it('execute_BeforeCreatePipelineCase_ShouldThrow', async () => {
+    // Arrange
+    const pipeline = new Pipeline<StudentModel>().addStep(addYear)
+
+    // Act & Assert
+    await expect(pipeline.execute(createStudent())).rejects.toThrow('Call createPipeline() before execute()')
+  })
+
+  it('addStep_AfterCreatePipelineCase_ShouldThrow', () => {
+    // Arrange
+    const pipeline = new Pipeline<StudentModel>().addStep(addYear).createPipeline()
+
+    // Act & Assert
+    expect(() => pipeline.addStep(calculateNameLength)).toThrow(
+      'The pipeline cannot be changed after createPipeline() has been called',
+    )
+  })
+
+  it('addCompensableStep_AfterCreatePipelineCase_ShouldThrow', () => {
+    // Arrange
+    const pipeline = new Pipeline<StudentModel>().addStep(addYear).createPipeline()
+
+    // Act & Assert
+    expect(() => pipeline.addCompensableStep(addYear, subtractYear)).toThrow(
+      'The pipeline cannot be changed after createPipeline() has been called',
+    )
+  })
+
+  it('onFailure_AfterCreatePipelineCase_ShouldThrow', () => {
+    // Arrange
+    const pipeline = new Pipeline<StudentModel>().addStep(addYear).createPipeline()
+
+    // Act & Assert
+    expect(() => pipeline.onFailure(async () => {})).toThrow(
+      'The pipeline cannot be changed after createPipeline() has been called',
+    )
+  })
+
   // --- Cancellation ---
   it('execute_SignalAlreadyAbortedCase_ShouldNotRunAnyStep', async () => {
     // Arrange
     const controller = new AbortController()
     controller.abort()
     const step = jest.fn(addYear)
-    const pipeline = new Pipeline<StudentModel>().addStep(step)
+    const pipeline = new Pipeline<StudentModel>().addStep(step).createPipeline()
 
     // Act & Assert
     await expect(pipeline.execute(createStudent(), controller.signal)).rejects.toThrow()
@@ -235,6 +290,7 @@ describe('Pipeline', () => {
       .addCompensableStep(addYear, subtractYear)
       .addStep(async () => controller.abort())
       .addStep(lastStep)
+      .createPipeline()
 
     // Act & Assert
     await expect(pipeline.execute(student, controller.signal)).rejects.toThrow()
@@ -246,7 +302,7 @@ describe('Pipeline', () => {
     // Arrange
     const controller = new AbortController()
     const step = jest.fn(async () => {})
-    const pipeline = new Pipeline<StudentModel>().addStep(step)
+    const pipeline = new Pipeline<StudentModel>().addStep(step).createPipeline()
     const student = createStudent()
 
     // Act

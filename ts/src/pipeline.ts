@@ -44,6 +44,7 @@ type StepDefinition<TModel> = {
 export class Pipeline<TModel> {
   private readonly steps: StepDefinition<TModel>[] = []
   private failureHandler?: PipelineFailureHandler<TModel>
+  private isBuilt = false
 
   /**
    * Registers a step with no compensation.
@@ -59,15 +60,18 @@ export class Pipeline<TModel> {
    * @param compensate Undoes the step; omit it to skip compensation
    */
   public addCompensableStep(step: PipelineStep<TModel>, compensate?: PipelineStep<TModel>) {
+    this.ensureNotBuilt()
     this.steps.push({ execute: step, compensate })
     return this
   }
 
   /**
    * Registers a final action that runs once when the pipeline fails, after the compensations and before the error
-   * is re-thrown to the caller. Only one handler can be registered.
+   * is re-thrown to the caller. Optional; only one handler can be registered.
+   * @param handler Receives the model, the error that failed the pipeline and the signal
    */
   public onFailure(handler: PipelineFailureHandler<TModel>) {
+    this.ensureNotBuilt()
     if (this.failureHandler) {
       throw new Error('onFailure() can only be called once')
     }
@@ -77,6 +81,19 @@ export class Pipeline<TModel> {
   }
 
   /**
+   * Finalizes the pipeline. Must be called before execute; no steps or onFailure handler can be added afterwards.
+   */
+  public createPipeline() {
+    if (this.steps.length === 0) {
+      throw new Error('At least one step must be added before calling createPipeline()')
+    }
+
+    this.isBuilt = true
+    return this
+  }
+
+  /**
+   * Runs the model through every step in order. Call createPipeline() first.
    * @param model The shared model every step reads from and writes to
    * @param signal Aborts the pipeline before the next step starts
    * @returns The same model, after every step ran
@@ -84,6 +101,10 @@ export class Pipeline<TModel> {
    * or a PipelineFailureHandlerError when the onFailure handler failed
    */
   public async execute(model: TModel, signal: AbortSignal = new AbortController().signal): Promise<TModel> {
+    if (!this.isBuilt) {
+      throw new Error('Call createPipeline() before execute()')
+    }
+
     const compensations: PipelineStep<TModel>[] = []
 
     try {
@@ -119,6 +140,12 @@ export class Pipeline<TModel> {
       }
 
       throw pipelineError
+    }
+  }
+
+  private ensureNotBuilt() {
+    if (this.isBuilt) {
+      throw new Error('The pipeline cannot be changed after createPipeline() has been called')
     }
   }
 }
