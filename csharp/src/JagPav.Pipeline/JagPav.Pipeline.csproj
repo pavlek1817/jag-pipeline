@@ -13,6 +13,7 @@
         <PackageId>JagPav.Pipeline</PackageId>
         <Version>1.0.0</Version>
         <Authors>Mario Pavlović</Authors>
+        <Company>JagPav</Company>
         <Description>A compensable pipeline for .NET, built on TPL Dataflow: thread a model through ordered steps, auto-compensating completed steps in reverse order on failure. Every step shares the same model-and-cancellation-token contract, so the resulting code is much more readable and the business flow is easier to follow at a glance.</Description>
         <PackageTags>pipeline;compensable-pipeline;saga;orchestration;dataflow;tpl-dataflow;rollback;compensation;dotnet</PackageTags>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
