@@ -124,6 +124,7 @@ describe('Pipeline', () => {
 
     // Assert — remaining compensations still run, both errors are reported
     expect(thrown).toBeInstanceOf(PipelineCompensationError)
+    expect((thrown as PipelineCompensationError).name).toBe('PipelineCompensationError')
     expect((thrown as PipelineCompensationError).error).toBe(error)
     expect((thrown as PipelineCompensationError).compensationErrors).toEqual([compensationError])
     expect(compensateFirst).toHaveBeenCalledTimes(1)

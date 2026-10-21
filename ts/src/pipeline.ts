@@ -10,6 +10,7 @@ export type PipelineStep<TModel> = (model: TModel, signal: AbortSignal) => Promi
 export class PipelineCompensationError extends Error {
   constructor(public readonly error: unknown, public readonly compensationErrors: unknown[]) {
     super(`Pipeline step failed and ${compensationErrors.length} compensation(s) failed too`)
+    this.name = 'PipelineCompensationError'
   }
 }
 
