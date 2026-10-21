@@ -23,6 +23,22 @@ internal sealed class PipelineTests : TestBase
         result.NameLength.Should().Be(5);
     }
 
+    [Test]
+    public async Task ExecuteAsync_GenericNarrowInterfaceStep_ShouldRunAgainstModel()
+    {
+        // Arrange
+        var student = new StudentModel { Name = "Alice", Age = 20 };
+        var pipeline = new Pipeline<StudentModel>()
+            .AddCompensableStep(addYearToAnyAged, subtractYear)
+            .Create();
+
+        // Act
+        var result = await pipeline.ExecuteAsync(student);
+
+        // Assert
+        result.Age.Should().Be(21);
+    }
+
     // --- Compensation ---
     [Test]
     public async Task ExecuteAsync_SecondStepFailsCase_ShouldCompensateFirstStepAndRethrow()
@@ -251,29 +267,41 @@ internal sealed class PipelineTests : TestBase
             .Should().Throw<InvalidOperationException>();
     }
 
-    private static Task addYear(StudentModel model, CancellationToken ct)
+    private static Task<StudentModel> addYear(StudentModel model, CancellationToken ct)
     {
         model.Age++;
-        return Task.CompletedTask;
+        return Task.FromResult(model);
     }
 
-    private static Task subtractYear(StudentModel model, CancellationToken ct)
+    private static Task<StudentModel> subtractYear(StudentModel model, CancellationToken ct)
     {
         model.Age--;
-        return Task.CompletedTask;
+        return Task.FromResult(model);
     }
 
-    private static Task calculateNameLength(StudentModel model, CancellationToken ct)
+    private static Task<TModel> addYearToAnyAged<TModel>(TModel model, CancellationToken ct)
+        where TModel : IAged
+    {
+        model.Age++;
+        return Task.FromResult(model);
+    }
+
+    private static Task<StudentModel> calculateNameLength(StudentModel model, CancellationToken ct)
     {
         model.NameLength = model.Name.Length;
-        return Task.CompletedTask;
+        return Task.FromResult(model);
     }
 
-    private sealed class StudentModel
+    private interface IAged
     {
-        internal string Name { get; init; } = string.Empty;
+        int Age { get; set; }
+    }
 
-        internal int Age { get; set; }
+    private sealed class StudentModel : IAged
+    {
+        public int Age { get; set; }
+
+        internal string Name { get; init; } = string.Empty;
 
         internal int NameLength { get; set; }
     }

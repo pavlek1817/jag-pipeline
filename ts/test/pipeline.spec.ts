@@ -23,6 +23,13 @@ const calculateNameLength = async (model: StudentModel) => {
   return model
 }
 
+type Aged = { age: number }
+
+const addYearToAnyAged = async <T extends Aged>(model: T) => {
+  model.age++
+  return model
+}
+
 const doNothing = async (model: StudentModel) => model
 
 const record = (calls: string[], call: string) => async (model: StudentModel) => {
@@ -72,6 +79,26 @@ describe('Pipeline', () => {
 
     // Assert
     expect(calls).toEqual(['first', 'second', 'third'])
+  })
+
+  it('execute_GenericNarrowTypeStep_ShouldRunAgainstModel', async () => {
+    // Arrange
+    const pipeline = new Pipeline<StudentModel>().addCompensableStep(addYearToAnyAged, subtractYear).create()
+
+    // Act
+    const result = await pipeline.execute(createStudent())
+
+    // Assert
+    expect(result.age).toBe(21)
+  })
+
+  it('addStep_NonGenericNarrowTypeStepCase_ShouldNotCompile', () => {
+    // Arrange
+    const addYearToAged = async (model: Aged): Promise<Aged> => model
+
+    // Act & Assert — a narrow-type step must be generic so it resolves with the pipeline's own model
+    // @ts-expect-error a step resolving with a narrower type is rejected
+    new Pipeline<StudentModel>().addStep(addYearToAged)
   })
 
   // --- Compensation ---

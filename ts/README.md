@@ -29,6 +29,21 @@ const result = await pipeline.execute(new StudentRegistrationModel(request), sig
 
 > Pass steps as arrow-function properties or bound functions: a plain method reference loses `this`.
 
+### Steps that only need part of the model
+
+A step must resolve with the model it was given, so a step that should only see a slice of the model is written as a generic function constrained to that type:
+
+```ts
+type ChargeModel = { student: Student; chargeId?: string }
+
+charge = async <T extends ChargeModel>(model: T): Promise<T> => {
+  model.chargeId = await this.gateway.charge(model.student)
+  return model
+}
+```
+
+It is still registered as `.addCompensableStep(paymentService.charge, paymentService.revertCharge)`: TypeScript infers `T` from the pipeline. Inside the step only `ChargeModel` fields are available, and a pipeline whose model lacks them does not compile. A non-generic `(model: ChargeModel) => Promise<ChargeModel>` is rejected, because it would resolve with the narrower type rather than the pipeline's model.
+
 ## API surface
 
 - **`addStep(step)`** — registers a step with no compensation.

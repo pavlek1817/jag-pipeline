@@ -12,7 +12,7 @@ internal sealed class PipelineContext<TModel>(TModel model, CancellationToken ct
 
     internal CancellationToken Ct { get; } = ct;
 
-    internal Stack<Func<TModel, CancellationToken, Task>> CompensateStack { get; } = new ();
+    internal Stack<Func<TModel, CancellationToken, Task<TModel>>> CompensateStack { get; } = new ();
 
     internal Exception? Error { get; set; }
 

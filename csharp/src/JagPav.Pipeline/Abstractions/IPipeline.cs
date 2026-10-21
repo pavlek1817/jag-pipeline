@@ -14,14 +14,14 @@ public interface IPipeline<TModel>
     /// <param name="executeAsync">The step to execute.</param>
     /// <param name="compensateAsync">The compensating action to run on failure. Pass <c>null</c> to skip compensation.</param>
     IPipeline<TModel> AddCompensableStep(
-        Func<TModel, CancellationToken, Task> executeAsync,
-        Func<TModel, CancellationToken, Task>? compensateAsync);
+        Func<TModel, CancellationToken, Task<TModel>> executeAsync,
+        Func<TModel, CancellationToken, Task<TModel>>? compensateAsync);
 
     /// <summary>
     /// Registers a step with no compensation. Calls <see cref="AddCompensableStep"/> with a null compensating action.
     /// </summary>
     /// <param name="executeAsync">The step to execute.</param>
-    IPipeline<TModel> AddStep(Func<TModel, CancellationToken, Task> executeAsync);
+    IPipeline<TModel> AddStep(Func<TModel, CancellationToken, Task<TModel>> executeAsync);
 
     /// <summary>
     /// Registers a final action that runs once when the pipeline fails, after the compensations and before

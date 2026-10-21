@@ -16,15 +16,15 @@ public sealed class Pipeline<TModel> : IPipeline<TModel>
     private ITargetBlock<PipelineContext<TModel>>? headBlock;
 
     public IPipeline<TModel> AddCompensableStep(
-        Func<TModel, CancellationToken, Task> executeAsync,
-        Func<TModel, CancellationToken, Task>? compensateAsync)
+        Func<TModel, CancellationToken, Task<TModel>> executeAsync,
+        Func<TModel, CancellationToken, Task<TModel>>? compensateAsync)
     {
         this.ensureNotCreated();
         this.steps.Add(new StepDefinition<TModel>(executeAsync, compensateAsync));
         return this;
     }
 
-    public IPipeline<TModel> AddStep(Func<TModel, CancellationToken, Task> executeAsync)
+    public IPipeline<TModel> AddStep(Func<TModel, CancellationToken, Task<TModel>> executeAsync)
     {
         return this.AddCompensableStep(executeAsync, null);
     }
@@ -139,7 +139,7 @@ public sealed class Pipeline<TModel> : IPipeline<TModel>
     }
 
     private static async Task compensateAllAsync(
-        Stack<Func<TModel, CancellationToken, Task>> compensateStack,
+        Stack<Func<TModel, CancellationToken, Task<TModel>>> compensateStack,
         TModel model,
         CancellationToken ct)
     {

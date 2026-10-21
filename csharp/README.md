@@ -7,7 +7,7 @@ A small, dependency-free compensable pipeline for .NET. It exists to **simplify 
 Every step a pipeline runs shares **one contract**:
 
 ```csharp
-Func<TModel, CancellationToken, Task>
+Func<TModel, CancellationToken, Task<TModel>>
 ```
 
 Because every step — validation, a DB call, a payment charge, whatever — takes the same shared model and the same `CancellationToken` and hands back the same model, a pipeline definition stops being a bespoke block of glue code and becomes a flat, readable list of method references. No per-step lambdas, no manual threading of individual fields between steps, no bespoke rollback code.
@@ -32,6 +32,21 @@ return result.Response!;
 ```
 
 Every method referenced above — across three unrelated services — has the exact same shape: `Task<StudentRegistrationContext> XAsync(StudentRegistrationContext model, CancellationToken ct)`. That's what keeps the definition above to nine lines instead of a wall of inline lambdas wiring narrower, mismatched method signatures together.
+
+### Steps that only need part of the model
+
+A step must resolve with the model it was given, so a step that should only see a slice of the model through an interface is written as a generic method constrained to that interface:
+
+```csharp
+public Task<TModel> ChargeAsync<TModel>(TModel model, CancellationToken ct)
+    where TModel : IChargeModel
+{
+    model.ChargeId = gateway.Charge(model.Student!);
+    return Task.FromResult(model);
+}
+```
+
+It is still registered as `.AddCompensableStep(paymentService.ChargeAsync, paymentService.RevertChargeAsync)`: the compiler infers `TModel` from the pipeline. Inside the step only `IChargeModel` members are available, and a pipeline whose model does not implement `IChargeModel` does not compile. A non-generic `Task<IChargeModel> ChargeAsync(IChargeModel model, ...)` is rejected, because it would resolve with the interface rather than the pipeline's model.
 
 ## API surface
 
