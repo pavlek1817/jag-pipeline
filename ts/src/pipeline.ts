@@ -20,7 +20,7 @@ type StepDefinition<TModel> = {
 }
 
 /**
- * Compensable pipeline, a TypeScript port of Jag.Pipeline (https://github.com/pavlek1817/jag-pipeline).
+ * Compensable pipeline, a TypeScript port of JagPav.Pipeline (https://github.com/pavlek1817/jag-pipeline).
  * Runs the model through every step in order. If a step fails, the compensations of the steps that already
  * succeeded run in reverse order, then the original error is re-thrown.
  *

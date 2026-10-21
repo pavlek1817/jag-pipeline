@@ -1,4 +1,4 @@
-# Jag.Pipeline
+# JagPav.Pipeline
 
 A small, dependency-free compensable pipeline for .NET. It exists to **simplify orchestration logic**: instead of hand-rolling try/catch blocks and manual rollback code for a multi-step process, you declare the steps once and the pipeline runs them in order, compensating (rolling back) whatever already succeeded if a later step fails.
 
@@ -12,7 +12,7 @@ Func<TModel, CancellationToken, Task>
 
 Because every step — validation, a DB call, a payment charge, whatever — takes the same shared model and the same `CancellationToken` and hands back the same model, a pipeline definition stops being a bespoke block of glue code and becomes a flat, readable list of method references. No per-step lambdas, no manual threading of individual fields between steps, no bespoke rollback code.
 
-For example, an eight-step student registration pipeline (see the full walkthrough in [`sample/Jag.Pipeline.Sample.Api`](sample/Jag.Pipeline.Sample.Api)) reads as:
+For example, an eight-step student registration pipeline (see the full walkthrough in [`sample/JagPav.Pipeline.Sample.Api`](sample/JagPav.Pipeline.Sample.Api)) reads as:
 
 ```csharp
 var pipeline = new Pipeline<StudentRegistrationContext>()
@@ -46,4 +46,4 @@ Every method referenced above — across three unrelated services — has the ex
 2. Write each step as `Task<TModel> XAsync(TModel model, CancellationToken ct)`, mutating and returning the model.
 3. Chain them with `AddStep` / `AddCompensableStep`, call `CreatePipeline()`, then `ExecuteAsync(model, ct)`.
 
-See [`sample/Jag.Pipeline.Sample.Api`](sample/Jag.Pipeline.Sample.Api) for a complete, runnable example, and [`test/Jag.Pipeline.UnitTests`](test/Jag.Pipeline.UnitTests) for the pipeline's own behavior (ordering, compensation, cancellation).
+See [`sample/JagPav.Pipeline.Sample.Api`](sample/JagPav.Pipeline.Sample.Api) for a complete, runnable example, and [`test/JagPav.Pipeline.UnitTests`](test/JagPav.Pipeline.UnitTests) for the pipeline's own behavior (ordering, compensation, cancellation).
