@@ -1,0 +1,56 @@
+{
+  "name": "@jagpav/pipeline",
+  "version": "1.0.0",
+  "description": "A compensable pipeline for TypeScript: thread a model through ordered steps, auto-compensating completed steps in reverse order on failure.",
+  "author": "Mario Pavlović",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pavlek1817/jag-pipeline",
+    "directory": "ts"
+  },
+  "keywords": [
+    "pipeline",
+    "compensable-pipeline",
+    "saga",
+    "orchestration",
+    "rollback",
+    "compensation",
+    "typescript"
+  ],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=17.3"
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "test": "jest",
+    "prepublishOnly": "npm run build"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.11.0",
+    "jest": "29.5.0",
+    "ts-jest": "29.1.0",
+    "typescript": "5.1.6"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
+    "testRegex": "test/.*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.ts$": "ts-jest"
+    },
+    "testEnvironment": "node"
+  }
+}
