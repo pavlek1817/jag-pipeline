@@ -63,5 +63,5 @@ public sealed class StudentRegistrationHandler
             .AddStep(this.studentService.CompleteRegistrationAsync)
             .AddStep(this.studentService.SaveChangesAsync)
             .AddStep(this.studentService.ShapeResponseAsync)
-            .CreatePipeline();
+            .Create();
 }

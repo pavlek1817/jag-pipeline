@@ -13,7 +13,7 @@ internal sealed class PipelineTests : TestBase
         var pipeline = new Pipeline<StudentModel>()
             .AddCompensableStep(addYear, subtractYear)
             .AddStep(calculateNameLength)
-            .CreatePipeline();
+            .Create();
 
         // Act
         var result = await pipeline.ExecuteAsync(student);
@@ -32,7 +32,7 @@ internal sealed class PipelineTests : TestBase
         var pipeline = new Pipeline<StudentModel>()
             .AddCompensableStep(addYear, subtractYear)
             .AddStep((_, _) => throw new InvalidOperationException("step 2 failed"))
-            .CreatePipeline();
+            .Create();
 
         // Act
         await pipeline
@@ -53,7 +53,7 @@ internal sealed class PipelineTests : TestBase
                 (_, _) => throw new InvalidOperationException("step 1 failed"),
                 subtractYear)
             .AddStep(calculateNameLength)
-            .CreatePipeline();
+            .Create();
 
         // Act
         await pipeline
@@ -87,7 +87,7 @@ internal sealed class PipelineTests : TestBase
                 receivedError = ex;
                 return Task.CompletedTask;
             })
-            .CreatePipeline();
+            .Create();
 
         // Act
         var thrown = await pipeline
@@ -112,7 +112,7 @@ internal sealed class PipelineTests : TestBase
                 onFailureCalled = true;
                 return Task.CompletedTask;
             })
-            .CreatePipeline();
+            .Create();
 
         // Act
         await pipeline.ExecuteAsync(new StudentModel { Name = "Alice", Age = 20 });
@@ -130,7 +130,7 @@ internal sealed class PipelineTests : TestBase
         var pipeline = new Pipeline<StudentModel>()
             .AddStep((_, _) => throw error)
             .OnFailure((_, _, _) => throw onFailureError)
-            .CreatePipeline();
+            .Create();
 
         // Act
         var task = pipeline.ExecuteAsync(new StudentModel { Name = "Alice", Age = 20 });
@@ -158,7 +158,7 @@ internal sealed class PipelineTests : TestBase
                 onFailureCalled = true;
                 return Task.CompletedTask;
             })
-            .CreatePipeline();
+            .Create();
 
         // Act
         var task = pipeline.ExecuteAsync(new StudentModel { Name = "Alice", Age = 20 });
@@ -174,16 +174,16 @@ internal sealed class PipelineTests : TestBase
 
     // --- Guard clauses ---
     [Test]
-    public void CreatePipeline_WithNoStepsCase_ShouldThrowInvalidOperationException()
+    public void Create_WithNoStepsCase_ShouldThrowInvalidOperationException()
     {
         // Act & Assert
         new Pipeline<StudentModel>()
-            .Invoking(p => p.CreatePipeline())
+            .Invoking(p => p.Create())
             .Should().Throw<InvalidOperationException>();
     }
 
     [Test]
-    public async Task ExecuteAsync_BeforeCreatePipelineCase_ShouldThrowInvalidOperationException()
+    public async Task ExecuteAsync_BeforeCreateCase_ShouldThrowInvalidOperationException()
     {
         // Arrange
         var pipeline = new Pipeline<StudentModel>()
@@ -196,12 +196,12 @@ internal sealed class PipelineTests : TestBase
     }
 
     [Test]
-    public void AddCompensableStep_AfterCreatePipelineCase_ShouldThrowInvalidOperationException()
+    public void AddCompensableStep_AfterCreateCase_ShouldThrowInvalidOperationException()
     {
         // Arrange
         var pipeline = new Pipeline<StudentModel>()
             .AddStep(addYear)
-            .CreatePipeline();
+            .Create();
 
         // Act & Assert
         pipeline
@@ -210,12 +210,12 @@ internal sealed class PipelineTests : TestBase
     }
 
     [Test]
-    public void AddStep_AfterCreatePipelineCase_ShouldThrowInvalidOperationException()
+    public void AddStep_AfterCreateCase_ShouldThrowInvalidOperationException()
     {
         // Arrange
         var pipeline = new Pipeline<StudentModel>()
             .AddStep(addYear)
-            .CreatePipeline();
+            .Create();
 
         // Act & Assert
         pipeline
@@ -238,12 +238,12 @@ internal sealed class PipelineTests : TestBase
     }
 
     [Test]
-    public void OnFailure_AfterCreatePipelineCase_ShouldThrowInvalidOperationException()
+    public void OnFailure_AfterCreateCase_ShouldThrowInvalidOperationException()
     {
         // Arrange
         var pipeline = new Pipeline<StudentModel>()
             .AddStep(addYear)
-            .CreatePipeline();
+            .Create();
 
         // Act & Assert
         pipeline
