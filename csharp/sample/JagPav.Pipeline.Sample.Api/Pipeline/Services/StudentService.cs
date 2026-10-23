@@ -43,7 +43,8 @@ public sealed class StudentService(SampleDbContext dbContext, TimeProvider timeP
         return Task.FromResult(model);
     }
 
-    public async Task<IIdentificationNumber> EnsureIdentificationNumberIsUniqueAsync(IIdentificationNumber model, CancellationToken ct)
+    public async Task<TModel> EnsureIdentificationNumberIsUniqueAsync<TModel>(TModel model, CancellationToken ct)
+        where TModel : IIdentificationNumber
     {
         var identificationNumber = model.IdentificationNumber;
         var exists = await dbContext.Students.AnyAsync(s => s.IdentificationNumber == identificationNumber, ct);

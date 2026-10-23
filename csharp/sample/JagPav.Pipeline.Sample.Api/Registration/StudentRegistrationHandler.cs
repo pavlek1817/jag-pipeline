@@ -23,8 +23,7 @@ namespace JagPav.Pipeline.Sample.Api.Registration;
 /// </summary>
 public sealed class StudentRegistrationHandler
 {
-    private IPipeline<StudentRegistrationPipelineModel> studentRegistrationPipeline;
-
+    private readonly IPipeline<StudentRegistrationPipelineModel> studentRegistrationPipeline;
     private readonly IStudentService studentService;
     private readonly IProgramCatalogService programCatalogService;
     private readonly IPaymentService paymentService;
@@ -54,7 +53,7 @@ public sealed class StudentRegistrationHandler
     }
 
     private IPipeline<StudentRegistrationPipelineModel> buildPipeline()
-        => new Pipeline<StudentRegistrationPipelineModel>()
+        => new PipelineBuilder<StudentRegistrationPipelineModel>()
             .AddStep(this.studentService.ValidateRequestAsync)
             .AddStep(this.studentService.EnsureIdentificationNumberIsUniqueAsync)
             .AddStep(this.programCatalogService.EnsureProgramExistsAsync)
@@ -63,5 +62,5 @@ public sealed class StudentRegistrationHandler
             .AddStep(this.studentService.CompleteRegistrationAsync)
             .AddStep(this.studentService.SaveChangesAsync)
             .AddStep(this.studentService.ShapeResponseAsync)
-            .CreatePipeline();
+            .Build();
 }
