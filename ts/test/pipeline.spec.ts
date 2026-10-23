@@ -45,7 +45,7 @@ describe('Pipeline', () => {
     const pipeline = new Pipeline<StudentModel>()
       .addCompensableStep(addYear, subtractYear)
       .addStep(calculateNameLength)
-      .create()
+      .build()
 
     // Act
     const result = await pipeline.execute(student)
@@ -72,7 +72,7 @@ describe('Pipeline', () => {
       .addStep(record(calls, 'first'))
       .addStep(record(calls, 'second'))
       .addStep(record(calls, 'third'))
-      .create()
+      .build()
 
     // Act
     await pipeline.execute(createStudent())
@@ -83,7 +83,7 @@ describe('Pipeline', () => {
 
   it('execute_GenericNarrowTypeStep_ShouldRunAgainstModel', async () => {
     // Arrange
-    const pipeline = new Pipeline<StudentModel>().addCompensableStep(addYearToAnyAged, subtractYear).create()
+    const pipeline = new Pipeline<StudentModel>().addCompensableStep(addYearToAnyAged, subtractYear).build()
 
     // Act
     const result = await pipeline.execute(createStudent())
@@ -111,7 +111,7 @@ describe('Pipeline', () => {
       .addStep(async () => {
         throw error
       })
-      .create()
+      .build()
 
     // Act & Assert
     await expect(pipeline.execute(student)).rejects.toBe(error)
@@ -129,7 +129,7 @@ describe('Pipeline', () => {
         throw new Error('step 1 failed')
       }, compensate)
       .addStep(calculateNameLength)
-      .create()
+      .build()
 
     // Act & Assert
     await expect(pipeline.execute(student)).rejects.toThrow('step 1 failed')
@@ -149,7 +149,7 @@ describe('Pipeline', () => {
       .addStep(async () => {
         throw new Error('step 3 failed')
       })
-      .create()
+      .build()
 
     // Act & Assert
     await expect(pipeline.execute(createStudent())).rejects.toThrow('step 3 failed')
@@ -169,7 +169,7 @@ describe('Pipeline', () => {
       .addStep(async () => {
         throw error
       })
-      .create()
+      .build()
 
     // Act
     const thrown = await pipeline.execute(createStudent()).catch((e: unknown) => e)
@@ -198,7 +198,7 @@ describe('Pipeline', () => {
         throw error
       })
       .onFailure(onFailure)
-      .create()
+      .build()
 
     // Act & Assert
     await expect(pipeline.execute(student)).rejects.toBe(error)
@@ -209,7 +209,7 @@ describe('Pipeline', () => {
   it('execute_AllStepsSucceedWithOnFailure_ShouldNotRunOnFailure', async () => {
     // Arrange
     const onFailure = jest.fn(async () => {})
-    const pipeline = new Pipeline<StudentModel>().addStep(addYear).onFailure(onFailure).create()
+    const pipeline = new Pipeline<StudentModel>().addStep(addYear).onFailure(onFailure).build()
 
     // Act
     await pipeline.execute(createStudent())
@@ -229,7 +229,7 @@ describe('Pipeline', () => {
       .onFailure(async () => {
         throw failureHandlerError
       })
-      .create()
+      .build()
 
     // Act
     const thrown = await pipeline.execute(createStudent()).catch((e: unknown) => e)
@@ -253,7 +253,7 @@ describe('Pipeline', () => {
         throw error
       })
       .onFailure(onFailure)
-      .create()
+      .build()
 
     // Act & Assert
     await expect(pipeline.execute(createStudent())).rejects.toBeInstanceOf(PipelineCompensationError)
@@ -269,48 +269,48 @@ describe('Pipeline', () => {
   })
 
   // --- Guard clauses ---
-  it('create_WithNoStepsCase_ShouldThrow', () => {
+  it('build_WithNoStepsCase_ShouldThrow', () => {
     // Act & Assert
-    expect(() => new Pipeline<StudentModel>().create()).toThrow(
-      'At least one step must be added before calling create()',
+    expect(() => new Pipeline<StudentModel>().build()).toThrow(
+      'At least one step must be added before calling build()',
     )
   })
 
-  it('execute_BeforeCreateCase_ShouldThrow', async () => {
+  it('execute_BeforeBuildCase_ShouldThrow', async () => {
     // Arrange
     const pipeline = new Pipeline<StudentModel>().addStep(addYear)
 
     // Act & Assert
-    await expect(pipeline.execute(createStudent())).rejects.toThrow('Call create() before execute()')
+    await expect(pipeline.execute(createStudent())).rejects.toThrow('Call build() before execute()')
   })
 
-  it('addStep_AfterCreateCase_ShouldThrow', () => {
+  it('addStep_AfterBuildCase_ShouldThrow', () => {
     // Arrange
-    const pipeline = new Pipeline<StudentModel>().addStep(addYear).create()
+    const pipeline = new Pipeline<StudentModel>().addStep(addYear).build()
 
     // Act & Assert
     expect(() => pipeline.addStep(calculateNameLength)).toThrow(
-      'The pipeline cannot be changed after create() has been called',
+      'The pipeline cannot be changed after build() has been called',
     )
   })
 
-  it('addCompensableStep_AfterCreateCase_ShouldThrow', () => {
+  it('addCompensableStep_AfterBuildCase_ShouldThrow', () => {
     // Arrange
-    const pipeline = new Pipeline<StudentModel>().addStep(addYear).create()
+    const pipeline = new Pipeline<StudentModel>().addStep(addYear).build()
 
     // Act & Assert
     expect(() => pipeline.addCompensableStep(addYear, subtractYear)).toThrow(
-      'The pipeline cannot be changed after create() has been called',
+      'The pipeline cannot be changed after build() has been called',
     )
   })
 
-  it('onFailure_AfterCreateCase_ShouldThrow', () => {
+  it('onFailure_AfterBuildCase_ShouldThrow', () => {
     // Arrange
-    const pipeline = new Pipeline<StudentModel>().addStep(addYear).create()
+    const pipeline = new Pipeline<StudentModel>().addStep(addYear).build()
 
     // Act & Assert
     expect(() => pipeline.onFailure(async () => {})).toThrow(
-      'The pipeline cannot be changed after create() has been called',
+      'The pipeline cannot be changed after build() has been called',
     )
   })
 
@@ -320,7 +320,7 @@ describe('Pipeline', () => {
     const controller = new AbortController()
     controller.abort()
     const step = jest.fn(addYear)
-    const pipeline = new Pipeline<StudentModel>().addStep(step).create()
+    const pipeline = new Pipeline<StudentModel>().addStep(step).build()
 
     // Act & Assert
     await expect(pipeline.execute(createStudent(), controller.signal)).rejects.toThrow()
@@ -339,7 +339,7 @@ describe('Pipeline', () => {
         return model
       })
       .addStep(lastStep)
-      .create()
+      .build()
 
     // Act & Assert
     await expect(pipeline.execute(student, controller.signal)).rejects.toThrow()
@@ -351,7 +351,7 @@ describe('Pipeline', () => {
     // Arrange
     const controller = new AbortController()
     const step = jest.fn(doNothing)
-    const pipeline = new Pipeline<StudentModel>().addStep(step).create()
+    const pipeline = new Pipeline<StudentModel>().addStep(step).build()
     const student = createStudent()
 
     // Act

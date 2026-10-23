@@ -34,7 +34,7 @@ public interface IPipeline<TModel>
     /// Finalizes the pipeline configuration. Must be called before <see cref="ExecuteAsync"/>.
     /// No further steps may be added after this call.
     /// </summary>
-    IPipeline<TModel> Create();
+    IPipeline<TModel> Build();
 
     /// <summary>
     /// Runs the model through all registered steps in order.

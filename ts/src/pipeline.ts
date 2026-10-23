@@ -84,9 +84,9 @@ export class Pipeline<TModel> {
   /**
    * Finalizes the pipeline. Must be called before execute; no steps or onFailure handler can be added afterwards.
    */
-  public create() {
+  public build() {
     if (this.steps.length === 0) {
-      throw new Error('At least one step must be added before calling create()')
+      throw new Error('At least one step must be added before calling build()')
     }
 
     this.isBuilt = true
@@ -94,7 +94,7 @@ export class Pipeline<TModel> {
   }
 
   /**
-   * Runs the model through every step in order. Call create() first.
+   * Runs the model through every step in order. Call build() first.
    * @param model The shared model every step reads from and writes to
    * @param signal Aborts the pipeline before the next step starts
    * @returns The same model, after every step ran
@@ -103,7 +103,7 @@ export class Pipeline<TModel> {
    */
   public async execute(model: TModel, signal: AbortSignal = new AbortController().signal): Promise<TModel> {
     if (!this.isBuilt) {
-      throw new Error('Call create() before execute()')
+      throw new Error('Call build() before execute()')
     }
 
     const compensations: PipelineStep<TModel>[] = []
@@ -146,7 +146,7 @@ export class Pipeline<TModel> {
 
   private ensureNotBuilt() {
     if (this.isBuilt) {
-      throw new Error('The pipeline cannot be changed after create() has been called')
+      throw new Error('The pipeline cannot be changed after build() has been called')
     }
   }
 }

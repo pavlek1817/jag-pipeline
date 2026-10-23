@@ -24,7 +24,7 @@ var pipeline = new Pipeline<StudentRegistrationContext>()
     .AddStep(studentService.CompleteRegistrationAsync)
     .AddStep(studentService.SaveChangesAsync)
     .AddStep(studentService.ShapeResponseAsync)
-    .Create();
+    .Build();
 
 var context = new StudentRegistrationContext(request);
 var result = await pipeline.ExecuteAsync(context, ct);
@@ -52,14 +52,14 @@ It is still registered as `.AddCompensableStep(paymentService.ChargeAsync, payme
 
 - **`AddStep(executeAsync)`** — registers a step with no compensation.
 - **`AddCompensableStep(executeAsync, compensateAsync)`** — registers a step alongside the action that undoes it if a *later* step fails.
-- **`OnFailure(onFailureAsync)`** — registers one final action that runs when the pipeline fails, after the compensations and before the exception reaches the caller. It receives the model, the exception and the token, e.g. to queue a retry or store a pending action. Can be called once, before `Create()`.
-- **`Create()`** — finalizes the step list. Must be called once, before `ExecuteAsync`.
+- **`OnFailure(onFailureAsync)`** — registers one final action that runs when the pipeline fails, after the compensations and before the exception reaches the caller. It receives the model, the exception and the token, e.g. to queue a retry or store a pending action. Can be called once, before `Build()`.
+- **`Build()`** — finalizes the step list. Must be called once, before `ExecuteAsync`.
 - **`ExecuteAsync(model, ct)`** — runs the model through every step in order. On failure, already-completed compensable steps are compensated in reverse order, the `OnFailure` action runs, then the original exception is re-thrown. If a compensation or the `OnFailure` action throws too, the original exception is still the one re-thrown; the others are kept in the returned task's `Exception.InnerExceptions`.
 
 ## Getting started
 
 1. Define a single model type that every step reads from and writes to (e.g. `StudentRegistrationContext`).
 2. Write each step as `Task<TModel> XAsync(TModel model, CancellationToken ct)`, mutating and returning the model.
-3. Chain them with `AddStep` / `AddCompensableStep`, call `Create()`, then `ExecuteAsync(model, ct)`.
+3. Chain them with `AddStep` / `AddCompensableStep`, call `Build()`, then `ExecuteAsync(model, ct)`.
 
 See [`sample/JagPav.Pipeline.Sample.Api`](sample/JagPav.Pipeline.Sample.Api) for a complete, runnable example, and [`test/JagPav.Pipeline.UnitTests`](test/JagPav.Pipeline.UnitTests) for the pipeline's own behavior (ordering, compensation, cancellation).

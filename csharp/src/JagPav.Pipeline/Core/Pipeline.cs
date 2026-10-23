@@ -4,7 +4,7 @@ using System.Threading.Tasks.Dataflow;
 namespace JagPav.Pipeline.Core;
 
 /// <summary>
-/// Dataflow-based compensable pipeline. <see cref="Create"/> builds and links the block network once.
+/// Dataflow-based compensable pipeline. <see cref="Build"/> builds and links the block network once.
 /// Each <see cref="ExecuteAsync"/> call posts a context through the live network and awaits its result.
 /// </summary>
 /// <typeparam name="TModel">Specified data model.</typeparam>
@@ -19,7 +19,7 @@ public sealed class Pipeline<TModel> : IPipeline<TModel>
         Func<TModel, CancellationToken, Task<TModel>> executeAsync,
         Func<TModel, CancellationToken, Task<TModel>>? compensateAsync)
     {
-        this.ensureNotCreated();
+        this.ensureNotBuilt();
         this.steps.Add(new StepDefinition<TModel>(executeAsync, compensateAsync));
         return this;
     }
@@ -31,7 +31,7 @@ public sealed class Pipeline<TModel> : IPipeline<TModel>
 
     public IPipeline<TModel> OnFailure(Func<TModel, Exception, CancellationToken, Task> onFailureAsync)
     {
-        this.ensureNotCreated();
+        this.ensureNotBuilt();
         if (this.onFailureAsync is not null)
         {
             throw new InvalidOperationException("OnFailure() can only be called once.");
@@ -41,11 +41,11 @@ public sealed class Pipeline<TModel> : IPipeline<TModel>
         return this;
     }
 
-    public IPipeline<TModel> Create()
+    public IPipeline<TModel> Build()
     {
         if (this.steps.Count == 0)
         {
-            throw new InvalidOperationException("At least one step must be added before calling Create().");
+            throw new InvalidOperationException("At least one step must be added before calling Build().");
         }
 
         var blockOptions = new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = 1 };
@@ -130,7 +130,7 @@ public sealed class Pipeline<TModel> : IPipeline<TModel>
     {
         if (this.headBlock is null)
         {
-            throw new InvalidOperationException("Call Create() before ExecuteAsync().");
+            throw new InvalidOperationException("Call Build() before ExecuteAsync().");
         }
 
         var ctx = new PipelineContext<TModel>(model, ct);
@@ -149,11 +149,11 @@ public sealed class Pipeline<TModel> : IPipeline<TModel>
         }
     }
 
-    private void ensureNotCreated()
+    private void ensureNotBuilt()
     {
         if (this.headBlock is not null)
         {
-            throw new InvalidOperationException("The pipeline cannot be changed after Create() has been called.");
+            throw new InvalidOperationException("The pipeline cannot be changed after Build() has been called.");
         }
     }
 }
