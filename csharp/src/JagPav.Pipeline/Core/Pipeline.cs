@@ -14,6 +14,7 @@ public sealed class Pipeline<TModel> : IPipeline<TModel>
     private readonly List<StepDefinition<TModel>> steps = new List<StepDefinition<TModel>>();
     private Func<TModel, Exception, CancellationToken, Task>? onFailureAsync;
     private ITargetBlock<PipelineContext<TModel>>? headBlock;
+    private bool isBuilt;
 
     public IPipeline<TModel> AddCompensableStep(
         Func<TModel, CancellationToken, Task<TModel>> executeAsync,
@@ -43,7 +44,7 @@ public sealed class Pipeline<TModel> : IPipeline<TModel>
 
     public IPipeline<TModel> Build()
     {
-        if (this.headBlock is not null)
+        if (this.isBuilt)
         {
             throw new InvalidOperationException("Build() can only be called once.");
         }
@@ -128,18 +129,19 @@ public sealed class Pipeline<TModel> : IPipeline<TModel>
         blocks[^1].LinkTo(finalBlock, linkOptions);
 
         this.headBlock = blocks[0];
+        this.isBuilt = true;
         return this;
     }
 
     public Task<TModel> ExecuteAsync(TModel model, CancellationToken ct = default)
     {
-        if (this.headBlock is null)
+        if (!this.isBuilt)
         {
             throw new InvalidOperationException("Call Build() before ExecuteAsync().");
         }
 
         var ctx = new PipelineContext<TModel>(model, ct);
-        this.headBlock.Post(ctx);
+        this.headBlock!.Post(ctx);
         return ctx.Tcs.Task;
     }
 
@@ -156,7 +158,7 @@ public sealed class Pipeline<TModel> : IPipeline<TModel>
 
     private void ensureNotBuilt()
     {
-        if (this.headBlock is not null)
+        if (this.isBuilt)
         {
             throw new InvalidOperationException("The pipeline cannot be changed after Build() has been called.");
         }
