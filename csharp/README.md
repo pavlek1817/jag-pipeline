@@ -15,7 +15,7 @@ Because every step — validation, a DB call, a payment charge, whatever — tak
 For example, an eight-step student registration pipeline (see the full walkthrough in [`sample/JagPav.Pipeline.Sample.Api`](sample/JagPav.Pipeline.Sample.Api)) reads as:
 
 ```csharp
-var pipeline = new Pipeline<StudentRegistrationContext>()
+var pipeline = new PipelineBuilder<StudentRegistrationContext>()
     .AddStep(studentService.ValidateRequestAsync)
     .AddStep(studentService.EnsureIdentificationNumberIsUniqueAsync)
     .AddStep(programCatalogService.EnsureProgramExistsAsync)
@@ -50,10 +50,15 @@ It is still registered as `.AddCompensableStep(paymentService.ChargeAsync, payme
 
 ## API surface
 
+A pipeline is configured with **`PipelineBuilder<TModel>`** (`IPipelineBuilder<TModel>`):
+
 - **`AddStep(executeAsync)`** — registers a step with no compensation.
 - **`AddCompensableStep(executeAsync, compensateAsync)`** — registers a step alongside the action that undoes it if a *later* step fails.
 - **`OnFailure(onFailureAsync)`** — registers one final action that runs when the pipeline fails, after the compensations and before the exception reaches the caller. It receives the model, the exception and the token, e.g. to queue a retry or store a pending action. Can be called once, before `Build()`.
-- **`Build()`** — finalizes the step list. Must be called once, before `ExecuteAsync`; a second call throws `InvalidOperationException`.
+- **`Build()`** — creates the pipeline from the registered steps and returns it as an `IPipeline<TModel>`. Can be called once; a second call throws `InvalidOperationException`, and the builder cannot be changed afterwards.
+
+The built **`IPipeline<TModel>`** only runs:
+
 - **`ExecuteAsync(model, ct)`** — runs the model through every step in order. On failure, already-completed compensable steps are compensated in reverse order, the `OnFailure` action runs, then the original exception is re-thrown. If a compensation or the `OnFailure` action throws too, the original exception is still the one re-thrown; the others are kept in the returned task's `Exception.InnerExceptions`.
 
 ### `OnFailure` is not a compensation
@@ -66,6 +71,6 @@ Use `OnFailure` for what should happen after the rollback is done: logging or al
 
 1. Define a single model type that every step reads from and writes to (e.g. `StudentRegistrationContext`).
 2. Write each step as `Task<TModel> XAsync(TModel model, CancellationToken ct)`, mutating and returning the model.
-3. Chain them with `AddStep` / `AddCompensableStep`, call `Build()`, then `ExecuteAsync(model, ct)`.
+3. Chain them on a `PipelineBuilder<TModel>` with `AddStep` / `AddCompensableStep`, call `Build()`, then `ExecuteAsync(model, ct)` on the returned pipeline.
 
 See [`sample/JagPav.Pipeline.Sample.Api`](sample/JagPav.Pipeline.Sample.Api) for a complete, runnable example, and [`test/JagPav.Pipeline.UnitTests`](test/JagPav.Pipeline.UnitTests) for the pipeline's own behavior (ordering, compensation, cancellation).

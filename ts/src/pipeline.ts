@@ -30,86 +30,39 @@ export class PipelineFailureHandlerError extends Error {
   }
 }
 
-type StepDefinition<TModel> = {
+/** @internal */
+export type StepDefinition<TModel> = {
   execute: PipelineStep<TModel>
   compensate?: PipelineStep<TModel>
 }
 
 /**
- * Compensable pipeline, a TypeScript port of JagPav.Pipeline
- * Runs the model through every step in order. If a step fails, the compensations of the steps that already
- * succeeded run in reverse order, then the onFailure handler runs (if registered) and the original error is re-thrown.
- *
- * Pass steps as arrow-function properties or bound functions: a plain method reference loses `this`.
+ * A compensable pipeline, created by PipelineBuilder.build(). A TypeScript port of JagPav.Pipeline.
  */
-export class Pipeline<TModel> {
-  private readonly steps: StepDefinition<TModel>[] = []
-  private failureHandler?: PipelineFailureHandler<TModel>
-  private isBuilt = false
-
+export interface Pipeline<TModel> {
   /**
-   * Registers a step with no compensation.
-   * @param step The step to run
-   */
-  public addStep(step: PipelineStep<TModel>) {
-    return this.addCompensableStep(step)
-  }
-
-  /**
-   * Registers a step paired with a compensating action that runs if a later step fails.
-   * @param step The step to run
-   * @param compensate Undoes the step; omit it to skip compensation
-   */
-  public addCompensableStep(step: PipelineStep<TModel>, compensate?: PipelineStep<TModel>) {
-    this.ensureNotBuilt()
-    this.steps.push({ execute: step, compensate })
-    return this
-  }
-
-  /**
-   * Registers a final action that runs once when the pipeline fails, after the compensations and before the error
-   * is re-thrown to the caller. Optional; only one handler can be registered.
-   * @param handler Receives the model, the error that failed the pipeline and the signal
-   */
-  public onFailure(handler: PipelineFailureHandler<TModel>) {
-    this.ensureNotBuilt()
-    if (this.failureHandler) {
-      throw new Error('onFailure() can only be called once')
-    }
-
-    this.failureHandler = handler
-    return this
-  }
-
-  /**
-   * Finalizes the pipeline. Must be called once, before execute; no steps or onFailure handler can be added afterwards.
-   */
-  public build() {
-    if (this.isBuilt) {
-      throw new Error('build() can only be called once')
-    }
-
-    if (this.steps.length === 0) {
-      throw new Error('At least one step must be added before calling build()')
-    }
-
-    this.isBuilt = true
-    return this
-  }
-
-  /**
-   * Runs the model through every step in order. Call build() first.
+   * Runs the model through every step in order. If a step fails, the compensations of the steps that already
+   * succeeded run in reverse order, then the onFailure handler runs (if registered) and the original error is re-thrown.
    * @param model The shared model every step reads from and writes to
    * @param signal Aborts the pipeline before the next step starts
    * @returns The same model, after every step ran
    * @throws The original error, a PipelineCompensationError when a compensation failed too,
    * or a PipelineFailureHandlerError when the onFailure handler failed
    */
-  public async execute(model: TModel, signal: AbortSignal = new AbortController().signal): Promise<TModel> {
-    if (!this.isBuilt) {
-      throw new Error('Call build() before execute()')
-    }
+  execute(model: TModel, signal?: AbortSignal): Promise<TModel>
+}
 
+/**
+ * Not part of the public API: a pipeline can only be created through PipelineBuilder.build().
+ * @internal
+ */
+export class CompensablePipeline<TModel> implements Pipeline<TModel> {
+  constructor(
+    private readonly steps: readonly StepDefinition<TModel>[],
+    private readonly failureHandler?: PipelineFailureHandler<TModel>,
+  ) {}
+
+  public async execute(model: TModel, signal: AbortSignal = new AbortController().signal): Promise<TModel> {
     const compensations: PipelineStep<TModel>[] = []
 
     try {
@@ -145,12 +98,6 @@ export class Pipeline<TModel> {
       }
 
       throw pipelineError
-    }
-  }
-
-  private ensureNotBuilt() {
-    if (this.isBuilt) {
-      throw new Error('The pipeline cannot be changed after build() has been called')
     }
   }
 }

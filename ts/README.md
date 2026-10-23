@@ -13,9 +13,9 @@ type PipelineStep<TModel> = (model: TModel, signal: AbortSignal) => Promise<TMod
 Because every step takes the same shared model and the same `AbortSignal`, and resolves with that model, a pipeline definition becomes a flat, readable list of step references:
 
 ```ts
-import { Pipeline } from '@jagpav/pipeline'
+import { PipelineBuilder } from '@jagpav/pipeline'
 
-const pipeline = new Pipeline<StudentRegistrationModel>()
+const pipeline = new PipelineBuilder<StudentRegistrationModel>()
   .addStep(studentService.validateRequest)
   .addStep(studentService.ensureIdentificationNumberIsUnique)
   .addStep(programCatalogService.ensureProgramExists)
@@ -46,11 +46,18 @@ It is still registered as `.addCompensableStep(paymentService.charge, paymentSer
 
 ## API surface
 
+A pipeline is configured with **`PipelineBuilder<TModel>`**:
+
 - **`addStep(step)`** — registers a step with no compensation.
 - **`addCompensableStep(step, compensate?)`** — registers a step alongside the action that undoes it if a *later* step fails.
 - **`onFailure(handler)`** — registers one final action that runs when the pipeline fails, after the compensations and before the error reaches the caller. It receives the model, the error and the signal, e.g. to queue a retry or store a pending action. Optional; can be called once, before `build()`.
-- **`build()`** — finalizes the pipeline. Must be called once, before `execute`; a second call throws. No steps or `onFailure` handler can be added afterwards.
+- **`build()`** — creates the pipeline from the registered steps and returns it as a `Pipeline<TModel>`. Can be called once; a second call throws, and no steps or `onFailure` handler can be added afterwards.
+
+The built **`Pipeline<TModel>`** only runs; it is an interface, so a pipeline can only be created through `build()`:
+
 - **`execute(model, signal?)`** — runs the model through every step in order and resolves with the same model. The signal is checked before each step. On failure, already-completed compensable steps are compensated in reverse order, the `onFailure` handler runs, then the original error is re-thrown.
+Errors:
+
 - **`PipelineCompensationError`** — thrown instead of the original error when one or more compensations also failed. Exposes `error` (the original) and `compensationErrors`. Every compensation runs even if an earlier one fails.
 - **`PipelineFailureHandlerError`** — thrown when the `onFailure` handler itself fails. Exposes `error` (what the pipeline would otherwise have thrown) and `failureHandlerError`.
 

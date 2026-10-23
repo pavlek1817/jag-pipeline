@@ -4,59 +4,23 @@ using System.Threading.Tasks.Dataflow;
 namespace JagPav.Pipeline.Core;
 
 /// <summary>
-/// Dataflow-based compensable pipeline. <see cref="Build"/> builds and links the block network once.
+/// Dataflow-based compensable pipeline, created by <see cref="PipelineBuilder{TModel}.Build"/>.
+/// The constructor builds and links the block network once.
 /// Each <see cref="ExecuteAsync"/> call posts a context through the live network and awaits its result.
 /// </summary>
 /// <typeparam name="TModel">Specified data model.</typeparam>
-public sealed class Pipeline<TModel> : IPipeline<TModel>
+internal sealed class Pipeline<TModel> : IPipeline<TModel>
     where TModel : class
 {
-    private readonly List<StepDefinition<TModel>> steps = new List<StepDefinition<TModel>>();
-    private Func<TModel, Exception, CancellationToken, Task>? onFailureAsync;
-    private ITargetBlock<PipelineContext<TModel>>? headBlock;
-    private bool isBuilt;
+    private readonly ITargetBlock<PipelineContext<TModel>> headBlock;
 
-    public IPipeline<TModel> AddCompensableStep(
-        Func<TModel, CancellationToken, Task<TModel>> executeAsync,
-        Func<TModel, CancellationToken, Task<TModel>>? compensateAsync)
+    internal Pipeline(
+        IReadOnlyList<StepDefinition<TModel>> steps,
+        Func<TModel, Exception, CancellationToken, Task>? onFailureAsync)
     {
-        this.ensureNotBuilt();
-        this.steps.Add(new StepDefinition<TModel>(executeAsync, compensateAsync));
-        return this;
-    }
-
-    public IPipeline<TModel> AddStep(Func<TModel, CancellationToken, Task<TModel>> executeAsync)
-    {
-        return this.AddCompensableStep(executeAsync, null);
-    }
-
-    public IPipeline<TModel> OnFailure(Func<TModel, Exception, CancellationToken, Task> onFailureAsync)
-    {
-        this.ensureNotBuilt();
-        if (this.onFailureAsync is not null)
-        {
-            throw new InvalidOperationException("OnFailure() can only be called once.");
-        }
-
-        this.onFailureAsync = onFailureAsync;
-        return this;
-    }
-
-    public IPipeline<TModel> Build()
-    {
-        if (this.isBuilt)
-        {
-            throw new InvalidOperationException("Build() can only be called once.");
-        }
-
-        if (this.steps.Count == 0)
-        {
-            throw new InvalidOperationException("At least one step must be added before calling Build().");
-        }
-
         var blockOptions = new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = 1 };
 
-        var blocks = this.steps
+        var blocks = steps
             .Select(step => new TransformBlock<PipelineContext<TModel>, PipelineContext<TModel>>(
                 async ctx =>
                 {
@@ -82,7 +46,6 @@ public sealed class Pipeline<TModel> : IPipeline<TModel>
                 }, blockOptions))
             .ToList();
 
-        var onFailureAsync = this.onFailureAsync;
         var finalBlock = new ActionBlock<PipelineContext<TModel>>(
             async ctx =>
             {
@@ -129,19 +92,12 @@ public sealed class Pipeline<TModel> : IPipeline<TModel>
         blocks[^1].LinkTo(finalBlock, linkOptions);
 
         this.headBlock = blocks[0];
-        this.isBuilt = true;
-        return this;
     }
 
     public Task<TModel> ExecuteAsync(TModel model, CancellationToken ct = default)
     {
-        if (!this.isBuilt)
-        {
-            throw new InvalidOperationException("Call Build() before ExecuteAsync().");
-        }
-
         var ctx = new PipelineContext<TModel>(model, ct);
-        this.headBlock!.Post(ctx);
+        this.headBlock.Post(ctx);
         return ctx.Tcs.Task;
     }
 
@@ -153,14 +109,6 @@ public sealed class Pipeline<TModel> : IPipeline<TModel>
         while (compensateStack.Count > 0)
         {
             await compensateStack.Pop()(model, ct);
-        }
-    }
-
-    private void ensureNotBuilt()
-    {
-        if (this.isBuilt)
-        {
-            throw new InvalidOperationException("The pipeline cannot be changed after Build() has been called.");
         }
     }
 }
