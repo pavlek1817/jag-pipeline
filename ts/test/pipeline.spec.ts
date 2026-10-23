@@ -276,6 +276,14 @@ describe('Pipeline', () => {
     )
   })
 
+  it('build_CalledTwiceCase_ShouldThrow', () => {
+    // Arrange
+    const pipeline = new Pipeline<StudentModel>().addStep(addYear).build()
+
+    // Act & Assert
+    expect(() => pipeline.build()).toThrow('build() can only be called once')
+  })
+
   it('execute_BeforeBuildCase_ShouldThrow', async () => {
     // Arrange
     const pipeline = new Pipeline<StudentModel>().addStep(addYear)

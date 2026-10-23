@@ -31,8 +31,8 @@ public interface IPipeline<TModel>
     IPipeline<TModel> OnFailure(Func<TModel, Exception, CancellationToken, Task> onFailureAsync);
 
     /// <summary>
-    /// Finalizes the pipeline configuration. Must be called before <see cref="ExecuteAsync"/>.
-    /// No further steps may be added after this call.
+    /// Finalizes the pipeline configuration. Must be called once, before <see cref="ExecuteAsync"/>; a second call throws
+    /// <see cref="InvalidOperationException"/>. No further steps may be added after this call.
     /// </summary>
     IPipeline<TModel> Build();
 

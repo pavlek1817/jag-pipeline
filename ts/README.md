@@ -49,10 +49,16 @@ It is still registered as `.addCompensableStep(paymentService.charge, paymentSer
 - **`addStep(step)`** — registers a step with no compensation.
 - **`addCompensableStep(step, compensate?)`** — registers a step alongside the action that undoes it if a *later* step fails.
 - **`onFailure(handler)`** — registers one final action that runs when the pipeline fails, after the compensations and before the error reaches the caller. It receives the model, the error and the signal, e.g. to queue a retry or store a pending action. Optional; can be called once, before `build()`.
-- **`build()`** — finalizes the pipeline. Must be called once, before `execute`; no steps or `onFailure` handler can be added afterwards.
+- **`build()`** — finalizes the pipeline. Must be called once, before `execute`; a second call throws. No steps or `onFailure` handler can be added afterwards.
 - **`execute(model, signal?)`** — runs the model through every step in order and resolves with the same model. The signal is checked before each step. On failure, already-completed compensable steps are compensated in reverse order, the `onFailure` handler runs, then the original error is re-thrown.
 - **`PipelineCompensationError`** — thrown instead of the original error when one or more compensations also failed. Exposes `error` (the original) and `compensationErrors`. Every compensation runs even if an earlier one fails.
 - **`PipelineFailureHandlerError`** — thrown when the `onFailure` handler itself fails. Exposes `error` (what the pipeline would otherwise have thrown) and `failureHandlerError`.
+
+### `onFailure` is not a compensation
+
+Do not use `onFailure` to undo the work of individual steps; pair each such step with its own compensating action through `addCompensableStep`. A compensation belongs to its step and runs only if that step completed, in reverse order with the others. `onFailure` runs once for the whole pipeline, whichever step failed, without knowing which steps completed, so rollback logic placed there has to guess what to undo.
+
+Use `onFailure` for what should happen after the rollback is done: logging or alerting, queueing a retry, or storing a pending action. It runs after every compensation, and its own failure does not affect them.
 
 ## Development
 

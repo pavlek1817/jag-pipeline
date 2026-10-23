@@ -199,6 +199,20 @@ internal sealed class PipelineTests : TestBase
     }
 
     [Test]
+    public void Build_CalledTwiceCase_ShouldThrowInvalidOperationException()
+    {
+        // Arrange
+        var pipeline = new Pipeline<StudentModel>()
+            .AddStep(addYear)
+            .Build();
+
+        // Act & Assert
+        pipeline
+            .Invoking(p => p.Build())
+            .Should().Throw<InvalidOperationException>();
+    }
+
+    [Test]
     public async Task ExecuteAsync_BeforeBuildCase_ShouldThrowInvalidOperationException()
     {
         // Arrange

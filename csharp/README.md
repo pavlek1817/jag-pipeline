@@ -53,8 +53,14 @@ It is still registered as `.AddCompensableStep(paymentService.ChargeAsync, payme
 - **`AddStep(executeAsync)`** — registers a step with no compensation.
 - **`AddCompensableStep(executeAsync, compensateAsync)`** — registers a step alongside the action that undoes it if a *later* step fails.
 - **`OnFailure(onFailureAsync)`** — registers one final action that runs when the pipeline fails, after the compensations and before the exception reaches the caller. It receives the model, the exception and the token, e.g. to queue a retry or store a pending action. Can be called once, before `Build()`.
-- **`Build()`** — finalizes the step list. Must be called once, before `ExecuteAsync`.
+- **`Build()`** — finalizes the step list. Must be called once, before `ExecuteAsync`; a second call throws `InvalidOperationException`.
 - **`ExecuteAsync(model, ct)`** — runs the model through every step in order. On failure, already-completed compensable steps are compensated in reverse order, the `OnFailure` action runs, then the original exception is re-thrown. If a compensation or the `OnFailure` action throws too, the original exception is still the one re-thrown; the others are kept in the returned task's `Exception.InnerExceptions`.
+
+### `OnFailure` is not a compensation
+
+Do not use `OnFailure` to undo the work of individual steps; pair each such step with its own compensating action through `AddCompensableStep`. A compensation belongs to its step and runs only if that step completed, in reverse order with the others. `OnFailure` runs once for the whole pipeline, whichever step failed, without knowing which steps completed, so rollback logic placed there has to guess what to undo.
+
+Use `OnFailure` for what should happen after the rollback is done: logging or alerting, queueing a retry, or storing a pending action. It runs after every compensation, and its own failure does not affect them.
 
 ## Getting started
 

@@ -82,9 +82,13 @@ export class Pipeline<TModel> {
   }
 
   /**
-   * Finalizes the pipeline. Must be called before execute; no steps or onFailure handler can be added afterwards.
+   * Finalizes the pipeline. Must be called once, before execute; no steps or onFailure handler can be added afterwards.
    */
   public build() {
+    if (this.isBuilt) {
+      throw new Error('build() can only be called once')
+    }
+
     if (this.steps.length === 0) {
       throw new Error('At least one step must be added before calling build()')
     }

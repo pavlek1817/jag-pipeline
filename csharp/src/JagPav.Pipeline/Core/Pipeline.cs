@@ -43,6 +43,11 @@ public sealed class Pipeline<TModel> : IPipeline<TModel>
 
     public IPipeline<TModel> Build()
     {
+        if (this.headBlock is not null)
+        {
+            throw new InvalidOperationException("Build() can only be called once.");
+        }
+
         if (this.steps.Count == 0)
         {
             throw new InvalidOperationException("At least one step must be added before calling Build().");
