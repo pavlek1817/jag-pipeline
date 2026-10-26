@@ -12,9 +12,11 @@ internal sealed class PipelineContext<TModel>(TModel model, CancellationToken ct
 
     internal CancellationToken Ct { get; } = ct;
 
-    internal Stack<Func<TModel, CancellationToken, Task>> CompensateStack { get; } = new ();
+    internal Stack<(int StepIndex, Func<TModel, CancellationToken, Task<TModel>> CompensateAsync)> CompensateStack { get; } = new ();
 
     internal Exception? Error { get; set; }
+
+    internal int FailedStepIndex { get; set; }
 
     internal TaskCompletionSource<TModel> Tcs { get; } = new (TaskCreationOptions.RunContinuationsAsynchronously);
 }

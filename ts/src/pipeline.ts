@@ -1,79 +1,124 @@
-/**
- * A step reads from and writes to the shared model. Declared as a function type (not a method signature)
- * so a step that needs fields the model does not have is a compile error.
- */
-export type PipelineStep<TModel> = (model: TModel, signal: AbortSignal) => Promise<unknown>
+import { CompensationFailure, PipelineError } from './pipeline.errors'
 
 /**
- * A step failed and so did at least one of the compensations run for it.
+ * A step reads from and writes to the shared model and resolves with it. Declared as a function type (not a method
+ * signature) so a step that needs fields the model does not have, or resolves with anything but the model, is a
+ * compile error.
  */
-export class PipelineCompensationError extends Error {
-  constructor(public readonly error: unknown, public readonly compensationErrors: unknown[]) {
-    super(`Pipeline step failed and ${compensationErrors.length} compensation(s) failed too`)
-    this.name = 'PipelineCompensationError'
-  }
+export type PipelineStep<TModel> = (model: TModel, signal: AbortSignal) => Promise<TModel>
+
+/**
+ * Runs once when the pipeline fails, after the compensations, with the same PipelineError the caller receives.
+ */
+export type PipelineFailureHandler<TModel> = (
+  model: TModel,
+  error: PipelineError,
+  signal: AbortSignal,
+) => Promise<unknown>
+
+/**
+ * What the pipeline does when a compensating action fails while it rolls back a failed run.
+ */
+export enum CompensationStrategy {
+  /** Runs every remaining compensation and reports all of their failures. The default. */
+  ContinueOnFailure = 'continueOnFailure',
+  /** Stops at the first compensation that fails; the steps whose compensation did not run are reported as not compensated. */
+  StopOnFirstFailure = 'stopOnFirstFailure',
 }
 
-type StepDefinition<TModel> = {
+/** @internal */
+export type StepDefinition<TModel> = {
+  stepIndex: number
   execute: PipelineStep<TModel>
   compensate?: PipelineStep<TModel>
 }
 
 /**
- * Compensable pipeline, a TypeScript port of JagPav.Pipeline (https://github.com/pavlek1817/jag-pipeline).
- * Runs the model through every step in order. If a step fails, the compensations of the steps that already
- * succeeded run in reverse order, then the original error is re-thrown.
- *
- * Pass steps as arrow-function properties or bound functions: a plain method reference loses `this`.
+ * A compensable pipeline, created by PipelineBuilder.build(). A TypeScript port of JagPav.Pipeline.
  */
-export class Pipeline<TModel> {
-  private readonly steps: StepDefinition<TModel>[] = []
-
-  public addStep(execute: PipelineStep<TModel>) {
-    return this.addCompensableStep(execute)
-  }
-
-  public addCompensableStep(execute: PipelineStep<TModel>, compensate?: PipelineStep<TModel>) {
-    this.steps.push({ execute, compensate })
-    return this
-  }
-
+export interface Pipeline<TModel> {
   /**
+   * Runs the model through every step in order. If a step fails, the compensations of the steps that already
+   * succeeded run in reverse order (following the builder's compensation strategy), then the onFailure handler runs
+   * (if registered) and a PipelineError is thrown.
    * @param model The shared model every step reads from and writes to
    * @param signal Aborts the pipeline before the next step starts
    * @returns The same model, after every step ran
-   * @throws The original error, or a PipelineCompensationError when a compensation failed too
+   * @throws PipelineError when a step failed; its originalError is what the step threw, and failed compensations or
+   * a failed onFailure handler are reported on it as well
    */
+  execute(model: TModel, signal?: AbortSignal): Promise<TModel>
+}
+
+/**
+ * Not part of the public API: a pipeline can only be created through PipelineBuilder.build().
+ * @internal
+ */
+export class CompensablePipeline<TModel> implements Pipeline<TModel> {
+  constructor(
+    private readonly steps: readonly StepDefinition<TModel>[],
+    private readonly failureHandler: PipelineFailureHandler<TModel> | undefined,
+    private readonly compensationStrategy: CompensationStrategy,
+  ) {}
+
   public async execute(model: TModel, signal: AbortSignal = new AbortController().signal): Promise<TModel> {
-    const compensations: PipelineStep<TModel>[] = []
+    const compensations: { stepIndex: number; compensate: PipelineStep<TModel> }[] = []
+    let failedStepIndex = 0
 
     try {
-      for (const { execute, compensate } of this.steps) {
+      for (const { stepIndex, execute, compensate } of this.steps) {
+        failedStepIndex = stepIndex
         signal.throwIfAborted()
         await execute(model, signal)
 
         if (compensate) {
-          compensations.push(compensate)
+          compensations.push({ stepIndex, compensate })
         }
       }
 
       return model
     } catch (error) {
-      const compensationErrors: unknown[] = []
+      let pipelineError = await this.compensateAll(model, error, failedStepIndex, compensations, signal)
 
-      for (const compensate of compensations.reverse()) {
+      if (this.failureHandler) {
         try {
-          await compensate(model, signal)
-        } catch (compensationError) {
-          compensationErrors.push(compensationError)
+          await this.failureHandler(model, pipelineError, signal)
+        } catch (failureHandlerError) {
+          pipelineError = pipelineError.withFailureHandlerError(failureHandlerError)
         }
       }
 
-      if (compensationErrors.length > 0) {
-        throw new PipelineCompensationError(error, compensationErrors)
+      throw pipelineError
+    }
+  }
+
+  private async compensateAll(
+    model: TModel,
+    error: unknown,
+    failedStepIndex: number,
+    compensations: { stepIndex: number; compensate: PipelineStep<TModel> }[],
+    signal: AbortSignal,
+  ) {
+    const compensationFailures: CompensationFailure[] = []
+
+    // Popping runs the compensations in reverse step order.
+    let next = compensations.pop()
+    while (next) {
+      try {
+        await next.compensate(model, signal)
+      } catch (compensationError) {
+        compensationFailures.push({ stepIndex: next.stepIndex, error: compensationError })
+        if (this.compensationStrategy === CompensationStrategy.StopOnFirstFailure) {
+          break
+        }
       }
 
-      throw error
+      next = compensations.pop()
     }
+
+    // Whatever is left was skipped by StopOnFirstFailure.
+    const notCompensatedStepIndexes = compensations.reverse().map((compensation) => compensation.stepIndex)
+
+    return new PipelineError(error, failedStepIndex, compensationFailures, notCompensatedStepIndexes)
   }
 }

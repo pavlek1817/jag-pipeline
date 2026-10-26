@@ -17,7 +17,9 @@ public interface IStudentService
 
     /// <summary>Step 2: verifies the identification number is not already registered.</summary>
     /// <exception cref="Exceptions.DuplicateIdentificationNumberException">Already registered.</exception>
-    Task<IIdentificationNumber> EnsureIdentificationNumberIsUniqueAsync(IIdentificationNumber model, CancellationToken ct);
+    /// <typeparam name="TModel">The pipeline model; only its <see cref="IIdentificationNumber"/> members are used.</typeparam>
+    Task<TModel> EnsureIdentificationNumberIsUniqueAsync<TModel>(TModel model, CancellationToken ct)
+        where TModel : IIdentificationNumber;
 
     /// <summary>Step 4: inserts a <see cref="Domain.StudentStatus.Pending"/> student and saves immediately.</summary>
     Task<StudentRegistrationPipelineModel> AddPendingAsync(StudentRegistrationPipelineModel model, CancellationToken ct);

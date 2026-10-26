@@ -13,7 +13,8 @@ public sealed class PaymentService : IPaymentService
 
     private readonly ConcurrentDictionary<string, (string StudentId, decimal Amount)> ledger = new ();
 
-    public Task<IChargeModel> ChargeAsync(IChargeModel model, CancellationToken ct)
+    public Task<TModel> ChargeAsync<TModel>(TModel model, CancellationToken ct)
+        where TModel : IChargeModel
     {
         var chargeId = Guid.NewGuid().ToString();
         this.ledger[chargeId] = (model.Student!.Id, RegistrationFee);
@@ -22,7 +23,8 @@ public sealed class PaymentService : IPaymentService
         return Task.FromResult(model);
     }
 
-    public Task<IRevertChargeModel> RevertChargeAsync(IRevertChargeModel model, CancellationToken ct)
+    public Task<TModel> RevertChargeAsync<TModel>(TModel model, CancellationToken ct)
+        where TModel : IRevertChargeModel
     {
         this.ledger.TryRemove(model.ChargeId!, out _);
 
