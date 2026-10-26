@@ -20,6 +20,7 @@
         <PackageReadmeFile>README.md</PackageReadmeFile>
         <RepositoryUrl>https://github.com/pavlek1817/jag-pipeline</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
+        <PackageReleaseNotes>2.0.0 (breaking): pipelines are now created with PipelineBuilder&lt;TModel&gt;().Build() instead of Pipeline&lt;TModel&gt;().CreatePipeline(); steps and compensations return Task&lt;TModel&gt;; a failed run throws PipelineException with the step's exception as OriginalException. Added: OnFailure action, CompensationStrategy (ContinueOnFailure, StopOnFirstFailure), and failure details on PipelineException. Fixed: a compensation that threw made ExecuteAsync hang. Full notes and upgrade guide: https://github.com/pavlek1817/jag-pipeline/blob/main/CHANGELOG.md</PackageReleaseNotes>
     </PropertyGroup>
 
     <ItemGroup>
