@@ -1,93 +1,159 @@
-import { PipelineBuilder, PipelineCompensationError, PipelineFailureHandlerError } from '../../src'
-import { StudentModel, createStudent, addYear, subtractYear, calculateNameLength, doNothing } from './helpers'
+import { CompensationStrategy, PipelineBuilder, PipelineError } from '../../src'
+import {
+  StudentModel,
+  createStudent,
+  addYear,
+  subtractYear,
+  calculateNameLength,
+  doNothing,
+  executeAndCatch,
+} from './helpers'
+
+const failWith = (error: unknown) => async (): Promise<StudentModel> => {
+  throw error
+}
 
 describe('Pipeline: edge cases', () => {
-  it('execute_FirstStepFails_ShouldNotCompensateAndRethrow', async () => {
+  it('execute_FirstStepFails_ShouldNotCompensateAndThrowPipelineError', async () => {
     // Arrange
     const student = createStudent()
+    const error = new Error('step 1 failed')
     const compensate = jest.fn(subtractYear)
     const pipeline = new PipelineBuilder<StudentModel>()
-      .addCompensableStep(async () => {
-        throw new Error('step 1 failed')
-      }, compensate)
+      .addCompensableStep(failWith(error), compensate)
       .addStep(calculateNameLength)
       .build()
 
-    // Act & Assert
-    await expect(pipeline.execute(student)).rejects.toThrow('step 1 failed')
+    // Act
+    const thrown = await executeAndCatch(pipeline, student)
 
     // Assert — first step never completed, nothing compensated
     expect(compensate).not.toHaveBeenCalled()
     expect(student.age).toBe(20)
     expect(student.nameLength).toBe(0)
+    expect(thrown.originalError).toBe(error)
+    expect(thrown.failedStepIndex).toBe(0)
+    expect(thrown.isFullyCompensated).toBe(true)
   })
 
-  it('execute_CompensationFailsCase_ShouldThrowPipelineCompensationError', async () => {
-    // Arrange
-    const error = new Error('step 3 failed')
-    const compensationError = new Error('compensation failed')
-    const compensateFirst = jest.fn(doNothing)
-    const pipeline = new PipelineBuilder<StudentModel>()
-      .addCompensableStep(doNothing, compensateFirst)
-      .addCompensableStep(doNothing, async () => {
-        throw compensationError
-      })
-      .addStep(async () => {
-        throw error
-      })
-      .build()
-
-    // Act
-    const thrown = await pipeline.execute(createStudent()).catch((e: unknown) => e)
-
-    // Assert — remaining compensations still run, both errors are reported
-    expect(thrown).toBeInstanceOf(PipelineCompensationError)
-    expect((thrown as PipelineCompensationError).name).toBe('PipelineCompensationError')
-    expect((thrown as PipelineCompensationError).error).toBe(error)
-    expect((thrown as PipelineCompensationError).compensationErrors).toEqual([compensationError])
-    expect(compensateFirst).toHaveBeenCalledTimes(1)
-  })
-
-  it('execute_OnFailureThrowsCase_ShouldThrowPipelineFailureHandlerError', async () => {
+  it('execute_OnFailureThrowsCase_ShouldKeepOriginalAndOnFailureError', async () => {
     // Arrange
     const error = new Error('step failed')
     const failureHandlerError = new Error('onFailure failed')
     const pipeline = new PipelineBuilder<StudentModel>()
-      .addStep(async () => {
-        throw error
-      })
-      .onFailure(async () => {
-        throw failureHandlerError
-      })
+      .addStep(failWith(error))
+      .onFailure(failWith(failureHandlerError))
       .build()
 
     // Act
-    const thrown = await pipeline.execute(createStudent()).catch((e: unknown) => e)
+    const thrown = await executeAndCatch(pipeline)
 
     // Assert
-    expect(thrown).toBeInstanceOf(PipelineFailureHandlerError)
-    expect((thrown as PipelineFailureHandlerError).name).toBe('PipelineFailureHandlerError')
-    expect((thrown as PipelineFailureHandlerError).error).toBe(error)
-    expect((thrown as PipelineFailureHandlerError).failureHandlerError).toBe(failureHandlerError)
+    expect(thrown.originalError).toBe(error)
+    expect(thrown.failureHandlerError).toBe(failureHandlerError)
+    expect(thrown.errors).toEqual([error, failureHandlerError])
   })
 
-  it('execute_CompensationThrowsWithOnFailureCase_ShouldRunOnFailureAndThrowPipelineCompensationError', async () => {
+  it('execute_CompensationThrowsWithOnFailureCase_ShouldRunOnFailureAndReportCompensationFailure', async () => {
     // Arrange
     const error = new Error('step 2 failed')
+    const compensationError = new Error('compensation failed')
     const onFailure = jest.fn(async () => {})
     const pipeline = new PipelineBuilder<StudentModel>()
-      .addCompensableStep(doNothing, async () => {
-        throw new Error('compensation failed')
-      })
-      .addStep(async () => {
-        throw error
-      })
+      .addCompensableStep(doNothing, failWith(compensationError))
+      .addStep(failWith(error))
       .onFailure(onFailure)
       .build()
 
-    // Act & Assert
-    await expect(pipeline.execute(createStudent())).rejects.toBeInstanceOf(PipelineCompensationError)
-    expect(onFailure).toHaveBeenCalledWith(expect.anything(), error, expect.any(AbortSignal))
+    // Act
+    const thrown = await executeAndCatch(pipeline)
+
+    // Assert — onFailure already sees the failed compensation
+    expect(thrown.originalError).toBe(error)
+    expect(thrown.isFullyCompensated).toBe(false)
+    expect(thrown.compensationFailures).toEqual([{ stepIndex: 0, error: compensationError }])
+    expect(thrown.errors).toEqual([error, compensationError])
+    expect(onFailure).toHaveBeenCalledWith(expect.anything(), thrown, expect.any(AbortSignal))
+  })
+
+  it('execute_DefaultStrategyMiddleCompensationFailsCase_ShouldStillCompensateEarlierSteps', async () => {
+    // Arrange
+    const student = createStudent()
+    const compensationError = new Error('compensation 1 failed')
+    const pipeline = new PipelineBuilder<StudentModel>()
+      .addCompensableStep(addYear, subtractYear)
+      .addCompensableStep(doNothing, failWith(compensationError))
+      .addStep(failWith(new Error('step 3 failed')))
+      .build()
+
+    // Act
+    const thrown = await executeAndCatch(pipeline, student)
+
+    // Assert — continueOnFailure is the default: the first step is compensated despite the failure before it
+    expect(student.age).toBe(20)
+    expect(thrown.failedStepIndex).toBe(2)
+    expect(thrown.compensationFailures).toEqual([{ stepIndex: 1, error: compensationError }])
+    expect(thrown.notCompensatedStepIndexes).toEqual([])
+    expect(thrown.isFullyCompensated).toBe(false)
+  })
+
+  it('execute_StopOnFirstFailureMiddleCompensationFailsCase_ShouldStopAndReportNotCompensatedSteps', async () => {
+    // Arrange
+    const student = createStudent()
+    const compensationError = new Error('compensation 1 failed')
+    const pipeline = new PipelineBuilder<StudentModel>(CompensationStrategy.StopOnFirstFailure)
+      .addCompensableStep(addYear, subtractYear)
+      .addCompensableStep(doNothing, failWith(compensationError))
+      .addStep(failWith(new Error('step 3 failed')))
+      .build()
+
+    // Act
+    const thrown = await executeAndCatch(pipeline, student)
+
+    // Assert — the first step's compensation never ran
+    expect(student.age).toBe(21)
+    expect(thrown.compensationFailures).toEqual([{ stepIndex: 1, error: compensationError }])
+    expect(thrown.notCompensatedStepIndexes).toEqual([0])
+    expect(thrown.isFullyCompensated).toBe(false)
+  })
+
+  it('execute_TwoCompensationsFailCase_ShouldReportBothInCompensationOrder', async () => {
+    // Arrange
+    const error = new Error('step 3 failed')
+    const firstCompensationError = new Error('compensation 0 failed')
+    const secondCompensationError = new Error('compensation 1 failed')
+    const pipeline = new PipelineBuilder<StudentModel>(CompensationStrategy.ContinueOnFailure)
+      .addCompensableStep(doNothing, failWith(firstCompensationError))
+      .addCompensableStep(doNothing, failWith(secondCompensationError))
+      .addStep(failWith(error))
+      .build()
+
+    // Act
+    const thrown = await executeAndCatch(pipeline)
+
+    // Assert — compensations run in reverse, so step 1's failure comes first
+    expect(thrown.compensationFailures.map((failure) => failure.stepIndex)).toEqual([1, 0])
+    expect(thrown.errors).toEqual([error, secondCompensationError, firstCompensationError])
+  })
+
+  it('execute_CompensationAndOnFailureThrowCase_ShouldKeepEveryErrorInOrder', async () => {
+    // Arrange
+    const error = new Error('step 2 failed')
+    const compensationError = new Error('compensation failed')
+    const failureHandlerError = new Error('onFailure failed')
+    const pipeline = new PipelineBuilder<StudentModel>()
+      .addCompensableStep(doNothing, failWith(compensationError))
+      .addStep(failWith(error))
+      .onFailure(failWith(failureHandlerError))
+      .build()
+
+    // Act
+    const thrown = await executeAndCatch(pipeline)
+
+    // Assert
+    expect(thrown.failureHandlerError).toBe(failureHandlerError)
+    expect(thrown.compensationFailures).toHaveLength(1)
+    expect(thrown.errors).toEqual([error, compensationError, failureHandlerError])
   })
 
   it('execute_SignalAlreadyAbortedCase_ShouldNotRunAnyStep', async () => {
@@ -97,9 +163,13 @@ describe('Pipeline: edge cases', () => {
     const step = jest.fn(addYear)
     const pipeline = new PipelineBuilder<StudentModel>().addStep(step).build()
 
-    // Act & Assert
-    await expect(pipeline.execute(createStudent(), controller.signal)).rejects.toThrow()
+    // Act
+    const thrown = await executeAndCatch(pipeline, createStudent(), controller.signal)
+
+    // Assert — the abort reason is the original error, reported against the step that did not run
     expect(step).not.toHaveBeenCalled()
+    expect(thrown.originalError).toBe(controller.signal.reason)
+    expect(thrown.failedStepIndex).toBe(0)
   })
 
   it('execute_SignalAbortedMidwayCase_ShouldStopAndCompensateCompletedSteps', async () => {
@@ -116,9 +186,13 @@ describe('Pipeline: edge cases', () => {
       .addStep(lastStep)
       .build()
 
-    // Act & Assert
-    await expect(pipeline.execute(student, controller.signal)).rejects.toThrow()
+    // Act
+    const thrown = await executeAndCatch(pipeline, student, controller.signal)
+
+    // Assert
     expect(lastStep).not.toHaveBeenCalled()
     expect(student.age).toBe(20)
+    expect(thrown.failedStepIndex).toBe(2)
+    expect(thrown.isFullyCompensated).toBe(true)
   })
 })

@@ -1,4 +1,11 @@
-import { CompensablePipeline, Pipeline, PipelineFailureHandler, PipelineStep, StepDefinition } from './pipeline'
+import {
+  CompensablePipeline,
+  CompensationStrategy,
+  Pipeline,
+  PipelineFailureHandler,
+  PipelineStep,
+  StepDefinition,
+} from './pipeline'
 
 /**
  * Collects the steps and the onFailure handler of a compensable pipeline. build() creates the pipeline once.
@@ -9,6 +16,15 @@ export class PipelineBuilder<TModel> {
   private readonly steps: StepDefinition<TModel>[] = []
   private failureHandler?: PipelineFailureHandler<TModel>
   private isBuilt = false
+
+  /**
+   * @param compensationStrategy What the pipeline does when a compensating action fails
+   */
+  constructor(private readonly compensationStrategy: CompensationStrategy = CompensationStrategy.ContinueOnFailure) {
+    if (!Object.values(CompensationStrategy).includes(compensationStrategy)) {
+      throw new RangeError(`Unknown compensation strategy: ${compensationStrategy}`)
+    }
+  }
 
   /**
    * Registers a step with no compensation.
@@ -25,15 +41,15 @@ export class PipelineBuilder<TModel> {
    */
   public addCompensableStep(step: PipelineStep<TModel>, compensate?: PipelineStep<TModel>) {
     this.ensureNotBuilt()
-    this.steps.push({ execute: step, compensate })
+    this.steps.push({ stepIndex: this.steps.length, execute: step, compensate })
     return this
   }
 
   /**
-   * Registers a final action that runs once when the pipeline fails, after the compensations and before the error
-   * is re-thrown to the caller. Optional; only one handler can be registered. It is not a replacement for a
+   * Registers a final action that runs once when the pipeline fails, after the compensations and before the
+   * PipelineError is thrown to the caller. Optional; only one handler can be registered. It is not a replacement for a
    * compensating action: undoing a step belongs in addCompensableStep.
-   * @param handler Receives the model, the error that failed the pipeline and the signal
+   * @param handler Receives the model, the same PipelineError the caller receives, and the signal
    */
   public onFailure(handler: PipelineFailureHandler<TModel>) {
     this.ensureNotBuilt()
@@ -58,7 +74,7 @@ export class PipelineBuilder<TModel> {
       throw new Error('At least one step must be added before calling build()')
     }
 
-    const pipeline = new CompensablePipeline([...this.steps], this.failureHandler)
+    const pipeline = new CompensablePipeline([...this.steps], this.failureHandler, this.compensationStrategy)
     this.isBuilt = true
     return pipeline
   }

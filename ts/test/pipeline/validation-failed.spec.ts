@@ -1,7 +1,12 @@
-import { PipelineBuilder } from '../../src'
+import { CompensationStrategy, PipelineBuilder } from '../../src'
 import { StudentModel, addYear, subtractYear, calculateNameLength, Aged } from './helpers'
 
 describe('Pipeline: validation failures', () => {
+  it('constructor_UnknownCompensationStrategyCase_ShouldThrow', () => {
+    // Act & Assert — a plain JavaScript caller can pass anything
+    expect(() => new PipelineBuilder<StudentModel>('unknown' as CompensationStrategy)).toThrow(RangeError)
+  })
+
   it('addStep_StepNotResolvingWithModelCase_ShouldNotCompile', () => {
     // Arrange
     const calls: string[] = []

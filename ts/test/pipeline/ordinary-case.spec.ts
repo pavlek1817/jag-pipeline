@@ -1,4 +1,4 @@
-import { PipelineBuilder } from '../../src'
+import { PipelineBuilder, PipelineError } from '../../src'
 import {
   StudentModel,
   createStudent,
@@ -7,6 +7,7 @@ import {
   calculateNameLength,
   addYearToAnyAged,
   doNothing,
+  executeAndCatch,
   record,
 } from './helpers'
 
@@ -55,7 +56,7 @@ describe('Pipeline: ordinary cases', () => {
     expect(result.age).toBe(21)
   })
 
-  it('execute_SecondStepFailsCase_ShouldCompensateFirstStepAndRethrow', async () => {
+  it('execute_SecondStepFailsCase_ShouldCompensateFirstStepAndThrowPipelineError', async () => {
     // Arrange
     const student = createStudent()
     const error = new Error('step 2 failed')
@@ -66,11 +67,17 @@ describe('Pipeline: ordinary cases', () => {
       })
       .build()
 
-    // Act & Assert
-    await expect(pipeline.execute(student)).rejects.toBe(error)
+    // Act
+    const thrown = await executeAndCatch(pipeline, student)
 
-    // Assert — first step was compensated, age reverted
+    // Assert — first step was compensated, age reverted, and the step's error is the cause
     expect(student.age).toBe(20)
+    expect(thrown.name).toBe('PipelineError')
+    expect(thrown.originalError).toBe(error)
+    expect(thrown.cause).toBe(error)
+    expect(thrown.failedStepIndex).toBe(1)
+    expect(thrown.isFullyCompensated).toBe(true)
+    expect(thrown.errors).toEqual([error])
   })
 
   it('execute_LastStepFails_ShouldCompensateInReverseOrder', async () => {
@@ -85,11 +92,11 @@ describe('Pipeline: ordinary cases', () => {
       .build()
 
     // Act & Assert
-    await expect(pipeline.execute(createStudent())).rejects.toThrow('step 3 failed')
+    await expect(pipeline.execute(createStudent())).rejects.toBeInstanceOf(PipelineError)
     expect(calls).toEqual(['compensate second', 'compensate first'])
   })
 
-  it('execute_StepFailsWithOnFailureCase_ShouldRunOnFailureAfterCompensationAndRethrow', async () => {
+  it('execute_StepFailsWithOnFailureCase_ShouldRunOnFailureAfterCompensationWithSameError', async () => {
     // Arrange
     const student = createStudent()
     const error = new Error('step 2 failed')
@@ -106,10 +113,13 @@ describe('Pipeline: ordinary cases', () => {
       .onFailure(onFailure)
       .build()
 
-    // Act & Assert
-    await expect(pipeline.execute(student)).rejects.toBe(error)
+    // Act
+    const thrown = await executeAndCatch(pipeline, student)
+
+    // Assert — compensation ran first, then onFailure got the same error the caller receives
     expect(calls).toEqual(['compensate', 'onFailure age=20'])
-    expect(onFailure).toHaveBeenCalledWith(student, error, expect.any(AbortSignal))
+    expect(onFailure).toHaveBeenCalledWith(student, thrown, expect.any(AbortSignal))
+    expect(thrown.originalError).toBe(error)
   })
 
   it('execute_AllStepsSucceedWithOnFailure_ShouldNotRunOnFailure', async () => {
