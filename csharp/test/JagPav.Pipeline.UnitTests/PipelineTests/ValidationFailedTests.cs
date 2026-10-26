@@ -5,12 +5,22 @@ namespace JagPav.Pipeline.UnitTests.PipelineTests;
 internal sealed class ValidationFailedTests : PipelineTestBase
 {
     [Test]
+    public void Constructor_UnknownCompensationStrategyCase_ShouldThrowArgumentOutOfRangeException()
+    {
+        // Act & Assert
+        FluentActions
+            .Invoking(() => new PipelineBuilder<StudentModel>((CompensationStrategy)42))
+            .Should().ThrowExactly<ArgumentOutOfRangeException>()
+            .WithParameterName("compensationStrategy");
+    }
+
+    [Test]
     public void AddCompensableStep_NullExecuteCase_ShouldThrowArgumentNullException()
     {
         // Act & Assert
         new PipelineBuilder<StudentModel>()
             .Invoking(b => b.AddCompensableStep(null!, subtractYear))
-            .Should().Throw<ArgumentNullException>()
+            .Should().ThrowExactly<ArgumentNullException>()
             .WithParameterName("executeAsync");
     }
 
@@ -20,7 +30,7 @@ internal sealed class ValidationFailedTests : PipelineTestBase
         // Act & Assert
         new PipelineBuilder<StudentModel>()
             .Invoking(b => b.AddStep(null!))
-            .Should().Throw<ArgumentNullException>()
+            .Should().ThrowExactly<ArgumentNullException>()
             .WithParameterName("executeAsync");
     }
 
@@ -30,7 +40,7 @@ internal sealed class ValidationFailedTests : PipelineTestBase
         // Act & Assert
         new PipelineBuilder<StudentModel>()
             .Invoking(b => b.OnFailure(null!))
-            .Should().Throw<ArgumentNullException>()
+            .Should().ThrowExactly<ArgumentNullException>()
             .WithParameterName("onFailureAsync");
     }
 
@@ -40,7 +50,7 @@ internal sealed class ValidationFailedTests : PipelineTestBase
         // Act & Assert
         new PipelineBuilder<StudentModel>()
             .Invoking(b => b.Build())
-            .Should().Throw<InvalidOperationException>();
+            .Should().ThrowExactly<InvalidOperationException>();
     }
 
     [Test]
@@ -54,7 +64,7 @@ internal sealed class ValidationFailedTests : PipelineTestBase
         // Act & Assert
         builder
             .Invoking(b => b.Build())
-            .Should().Throw<InvalidOperationException>();
+            .Should().ThrowExactly<InvalidOperationException>();
     }
 
     [Test]
@@ -68,7 +78,7 @@ internal sealed class ValidationFailedTests : PipelineTestBase
         // Act & Assert
         builder
             .Invoking(b => b.AddCompensableStep(addYear, subtractYear))
-            .Should().Throw<InvalidOperationException>();
+            .Should().ThrowExactly<InvalidOperationException>();
     }
 
     [Test]
@@ -82,7 +92,7 @@ internal sealed class ValidationFailedTests : PipelineTestBase
         // Act & Assert
         builder
             .Invoking(b => b.AddStep(calculateNameLength))
-            .Should().Throw<InvalidOperationException>();
+            .Should().ThrowExactly<InvalidOperationException>();
     }
 
     [Test]
@@ -96,7 +106,7 @@ internal sealed class ValidationFailedTests : PipelineTestBase
         // Act & Assert
         builder
             .Invoking(b => b.OnFailure((_, _, _) => Task.CompletedTask))
-            .Should().Throw<InvalidOperationException>();
+            .Should().ThrowExactly<InvalidOperationException>();
     }
 
     [Test]
@@ -110,6 +120,6 @@ internal sealed class ValidationFailedTests : PipelineTestBase
         // Act & Assert
         builder
             .Invoking(b => b.OnFailure((_, _, _) => Task.CompletedTask))
-            .Should().Throw<InvalidOperationException>();
+            .Should().ThrowExactly<InvalidOperationException>();
     }
 }

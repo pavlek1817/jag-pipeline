@@ -15,8 +15,9 @@ namespace JagPav.Pipeline.Sample.Api.Registration;
 /// 6. Activate the student in memory.
 /// 7. Save the final state.
 /// 8. Shape the response.
-/// If any step fails, steps 4 and 5 (if reached) are compensated in reverse order before the
-/// original exception is re-thrown, so a failed registration leaves no trace.
+/// If any step fails, steps 4 and 5 (if reached) are compensated in reverse order before a
+/// <see cref="JagPav.Pipeline.Exceptions.PipelineException"/> wrapping the step's exception is thrown, so a failed
+/// registration leaves no trace.
 /// Every step shares the same <see cref="StudentRegistrationPipelineModel"/> and
 /// <see cref="CancellationToken"/> contract, so the pipeline definition below is just a list of
 /// method references.

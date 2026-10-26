@@ -52,20 +52,68 @@ It is still registered as `.AddCompensableStep(paymentService.ChargeAsync, payme
 
 A pipeline is configured with **`PipelineBuilder<TModel>`** (`IPipelineBuilder<TModel>`):
 
+- **`new PipelineBuilder<TModel>(compensationStrategy)`** — creates a builder. The strategy is optional and defaults to `CompensationStrategy.ContinueOnFailure`; see [Compensation strategy](#compensation-strategy).
 - **`AddStep(executeAsync)`** — registers a step with no compensation.
 - **`AddCompensableStep(executeAsync, compensateAsync)`** — registers a step alongside the action that undoes it if a *later* step fails.
-- **`OnFailure(onFailureAsync)`** — registers one final action that runs when the pipeline fails, after the compensations and before the exception reaches the caller. It receives the model, the exception and the token, e.g. to queue a retry or store a pending action. Can be called once, before `Build()`.
+- **`OnFailure(onFailureAsync)`** — registers one final action that runs when the pipeline fails, after the compensations and before the exception reaches the caller. It receives the model, the same `PipelineException` the caller gets and the token, e.g. to queue a retry or store a pending action. Can be called once, before `Build()`.
 - **`Build()`** — creates the pipeline from the registered steps and returns it as an `IPipeline<TModel>`. Can be called once; a second call throws `InvalidOperationException`, and the builder cannot be changed afterwards.
 
 The built **`IPipeline<TModel>`** only runs:
 
-- **`ExecuteAsync(model, ct)`** — runs the model through every step in order. On failure, already-completed compensable steps are compensated in reverse order, the `OnFailure` action runs, then the original exception is re-thrown. If a compensation or the `OnFailure` action throws too, the original exception is still the one re-thrown; the others are kept in the returned task's `Exception.InnerExceptions`.
+- **`ExecuteAsync(model, ct)`** — runs the model through every step in order. On failure, already-completed compensable steps are compensated in reverse order, the `OnFailure` action runs, then a `PipelineException` is thrown; see [Errors](#errors).
+
+### Compensation strategy
+
+The strategy passed to the builder decides what happens when a compensating action itself fails:
+
+- **`ContinueOnFailure`** (default) — the remaining compensations still run, so as much as possible is undone. Every failure is reported.
+- **`StopOnFirstFailure`** — the rollback stops at the first failing compensation. The steps whose compensation did not run are reported in `NotCompensatedStepIndexes`.
+
+```csharp
+var pipeline = new PipelineBuilder<StudentRegistrationContext>(CompensationStrategy.StopOnFirstFailure)
+    .AddCompensableStep(studentService.AddPendingAsync, studentService.RemovePendingAsync)
+    .AddCompensableStep(paymentService.ChargeAsync, paymentService.RevertChargeAsync)
+    .Build();
+```
+
+### Errors
+
+When a step fails, `ExecuteAsync` always throws a **`PipelineException`** (`JagPav.Pipeline.Exceptions`). Its `InnerException` is the step's exception, so the caller can still tell what went wrong in the first place; the rest describes the rollback:
+
+| Member | Meaning |
+| --- | --- |
+| `OriginalException` | The exception of the step that failed; the same as `InnerException` |
+| `FailedStepIndex` | 0-based index of the step that failed, in the order the steps were added |
+| `CompensationFailures` | Each compensation that failed: its `StepIndex` and `Exception`, in the order they ran |
+| `NotCompensatedStepIndexes` | Steps whose compensation did not run (only with `StopOnFirstFailure`) |
+| `FailureHandlerException` | The `OnFailure` action's exception, or `null` if it did not fail |
+| `IsFullyCompensated` | `true` when no compensation failed or was skipped |
+| `Exceptions` | Every exception in order: the original one, the failed compensations, then the `OnFailure` action's |
+
+Map the original exception to a response with exception filters, and treat an incomplete rollback separately, since the system may then be left inconsistent:
+
+```csharp
+try
+{
+    return Results.Ok(await pipeline.ExecuteAsync(context, ct));
+}
+catch (PipelineException ex) when (!ex.IsFullyCompensated)
+{
+    return Results.Problem(statusCode: StatusCodes.Status500InternalServerError);
+}
+catch (PipelineException ex) when (ex.OriginalException is DuplicateIdentificationNumberException duplicate)
+{
+    return Results.Conflict(new { duplicate.Message });
+}
+```
+
+A cancelled run is reported the same way, with an `OperationCanceledException` as the `OriginalException`.
 
 ### `OnFailure` is not a compensation
 
 Do not use `OnFailure` to undo the work of individual steps; pair each such step with its own compensating action through `AddCompensableStep`. A compensation belongs to its step and runs only if that step completed, in reverse order with the others. `OnFailure` runs once for the whole pipeline, whichever step failed, without knowing which steps completed, so rollback logic placed there has to guess what to undo.
 
-Use `OnFailure` for what should happen after the rollback is done: logging or alerting, queueing a retry, or storing a pending action. It runs after every compensation, and its own failure does not affect them.
+Use `OnFailure` for what should happen after the rollback is done: logging or alerting, queueing a retry, or storing a pending action for what could not be undone (`NotCompensatedStepIndexes`, `CompensationFailures`). It runs after every compensation, and its own failure does not affect them; it is reported as `FailureHandlerException`.
 
 ## Getting started
 

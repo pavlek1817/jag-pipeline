@@ -5,6 +5,7 @@ namespace JagPav.Pipeline.Core;
 /// </summary>
 /// <typeparam name="TModel">The shared model passed through the pipeline.</typeparam>
 internal sealed record StepDefinition<TModel>(
+    int stepIndex,
     Func<TModel, CancellationToken, Task<TModel>> executeAsync,
     Func<TModel, CancellationToken, Task<TModel>>? compensateAsync)
     where TModel : class;

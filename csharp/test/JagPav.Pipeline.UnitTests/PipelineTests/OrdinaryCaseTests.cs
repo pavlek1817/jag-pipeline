@@ -1,4 +1,5 @@
 using JagPav.Pipeline.Core;
+using JagPav.Pipeline.Exceptions;
 
 namespace JagPav.Pipeline.UnitTests.PipelineTests;
 
@@ -39,32 +40,38 @@ internal sealed class OrdinaryCaseTests : PipelineTestBase
     }
 
     [Test]
-    public async Task ExecuteAsync_SecondStepFailsCase_ShouldCompensateFirstStepAndRethrow()
+    public async Task ExecuteAsync_SecondStepFailsCase_ShouldCompensateFirstStepAndThrowPipelineException()
     {
         // Arrange
         var student = new StudentModel { Name = "Alice", Age = 20 };
+        var error = new InvalidOperationException("step 2 failed");
         var pipeline = new PipelineBuilder<StudentModel>()
             .AddCompensableStep(addYear, subtractYear)
-            .AddStep((_, _) => throw new InvalidOperationException("step 2 failed"))
+            .AddStep((_, _) => throw error)
             .Build();
 
         // Act
-        await pipeline
+        var thrown = await pipeline
             .Invoking(p => p.ExecuteAsync(student))
-            .Should().ThrowAsync<InvalidOperationException>();
+            .Should().ThrowExactlyAsync<PipelineException>();
 
-        // Assert — first step was compensated, Age reverted
+        // Assert — first step was compensated, Age reverted, and the step's exception is the cause
         student.Age.Should().Be(20);
+        thrown.Which.OriginalException.Should().BeEquivalentTo(error);
+        thrown.Which.InnerException.Should().BeEquivalentTo(error);
+        thrown.Which.FailedStepIndex.Should().Be(1);
+        thrown.Which.IsFullyCompensated.Should().BeTrue();
+        thrown.Which.Exceptions.Should().Equal(error);
     }
 
     [Test]
-    public async Task ExecuteAsync_StepFailsWithOnFailureCase_ShouldRunOnFailureAfterCompensationAndRethrow()
+    public async Task ExecuteAsync_StepFailsWithOnFailureCase_ShouldRunOnFailureAfterCompensationWithSameException()
     {
         // Arrange
         var student = new StudentModel { Name = "Alice", Age = 20 };
         var error = new InvalidOperationException("step 2 failed");
         var calls = new List<string>();
-        Exception? receivedError = null;
+        PipelineException? receivedException = null;
         var pipeline = new PipelineBuilder<StudentModel>()
             .AddCompensableStep(addYear, (m, ct) =>
             {
@@ -75,7 +82,7 @@ internal sealed class OrdinaryCaseTests : PipelineTestBase
             .OnFailure((m, ex, _) =>
             {
                 calls.Add($"onFailure age={m.Age}");
-                receivedError = ex;
+                receivedException = ex;
                 return Task.CompletedTask;
             })
             .Build();
@@ -83,12 +90,12 @@ internal sealed class OrdinaryCaseTests : PipelineTestBase
         // Act
         var thrown = await pipeline
             .Invoking(p => p.ExecuteAsync(student))
-            .Should().ThrowAsync<InvalidOperationException>();
+            .Should().ThrowExactlyAsync<PipelineException>();
 
-        // Assert — compensation ran first, then OnFailure got the original error, which still reached the caller
-        thrown.Which.Should().BeSameAs(error);
-        receivedError.Should().BeSameAs(error);
+        // Assert — compensation ran first, then OnFailure got the same exception the caller receives
         calls.Should().Equal("compensate", "onFailure age=20");
+        receivedException.Should().BeEquivalentTo(thrown.Which);
+        receivedException!.OriginalException.Should().BeEquivalentTo(error);
     }
 
     [Test]

@@ -1,4 +1,5 @@
 using JagPav.Pipeline.Abstractions;
+using JagPav.Pipeline.Exceptions;
 using System.Threading.Tasks.Dataflow;
 
 namespace JagPav.Pipeline.Core;
@@ -16,7 +17,8 @@ internal sealed class Pipeline<TModel> : IPipeline<TModel>
 
     internal Pipeline(
         IReadOnlyList<StepDefinition<TModel>> steps,
-        Func<TModel, Exception, CancellationToken, Task>? onFailureAsync)
+        Func<TModel, PipelineException, CancellationToken, Task>? onFailureAsync,
+        CompensationStrategy compensationStrategy)
     {
         var blockOptions = new ExecutionDataflowBlockOptions { MaxDegreeOfParallelism = 1 };
 
@@ -34,12 +36,13 @@ internal sealed class Pipeline<TModel> : IPipeline<TModel>
                         await step.executeAsync(ctx.Model, ctx.Ct);
                         if (step.compensateAsync is not null)
                         {
-                            ctx.CompensateStack.Push(step.compensateAsync);
+                            ctx.CompensateStack.Push((step.stepIndex, step.compensateAsync));
                         }
                     }
                     catch (Exception ex)
                     {
                         ctx.Error = ex;
+                        ctx.FailedStepIndex = step.stepIndex;
                     }
 
                     return ctx;
@@ -51,31 +54,21 @@ internal sealed class Pipeline<TModel> : IPipeline<TModel>
             {
                 if (ctx.Error is not null)
                 {
-                    // The original exception goes first so it is the one awaiting callers see.
-                    var errors = new List<Exception> { ctx.Error };
-
-                    try
-                    {
-                        await compensateAllAsync(ctx.CompensateStack, ctx.Model, ctx.Ct);
-                    }
-                    catch (Exception ex)
-                    {
-                        errors.Add(ex);
-                    }
+                    var exception = await compensateAllAsync(ctx, compensationStrategy);
 
                     if (onFailureAsync is not null)
                     {
                         try
                         {
-                            await onFailureAsync(ctx.Model, ctx.Error, ctx.Ct);
+                            await onFailureAsync(ctx.Model, exception, ctx.Ct);
                         }
                         catch (Exception ex)
                         {
-                            errors.Add(ex);
+                            exception = exception.WithFailureHandlerException(ex);
                         }
                     }
 
-                    ctx.Tcs.SetException(errors);
+                    ctx.Tcs.SetException(exception);
                 }
                 else
                 {
@@ -101,14 +94,31 @@ internal sealed class Pipeline<TModel> : IPipeline<TModel>
         return ctx.Tcs.Task;
     }
 
-    private static async Task compensateAllAsync(
-        Stack<Func<TModel, CancellationToken, Task<TModel>>> compensateStack,
-        TModel model,
-        CancellationToken ct)
+    private static async Task<PipelineException> compensateAllAsync(
+        PipelineContext<TModel> ctx,
+        CompensationStrategy compensationStrategy)
     {
-        while (compensateStack.Count > 0)
+        var compensationFailures = new List<CompensationFailure>();
+        while (ctx.CompensateStack.Count > 0)
         {
-            await compensateStack.Pop()(model, ct);
+            var (stepIndex, compensateAsync) = ctx.CompensateStack.Pop();
+            try
+            {
+                await compensateAsync(ctx.Model, ctx.Ct);
+            }
+            catch (Exception ex)
+            {
+                compensationFailures.Add(new CompensationFailure(stepIndex, ex));
+                if (compensationStrategy == CompensationStrategy.StopOnFirstFailure)
+                {
+                    break;
+                }
+            }
         }
+
+        // Whatever is left on the stack was skipped by StopOnFirstFailure.
+        var notCompensatedStepIndexes = ctx.CompensateStack.Select(compensation => compensation.StepIndex).ToList();
+
+        return new PipelineException(ctx.Error!, ctx.FailedStepIndex, compensationFailures, notCompensatedStepIndexes);
     }
 }

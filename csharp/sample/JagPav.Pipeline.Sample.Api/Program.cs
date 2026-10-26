@@ -1,3 +1,4 @@
+using JagPav.Pipeline.Exceptions;
 using JagPav.Pipeline.Sample.Api.Data;
 using JagPav.Pipeline.Sample.Api.Exceptions;
 using JagPav.Pipeline.Sample.Api.Models;
@@ -39,17 +40,22 @@ app.MapPost("/students/register", async (StudentAddModel request, StudentRegistr
         var response = await handler.RegisterAsync(request, ct);
         return Results.Created($"/students/{response.Id}", response);
     }
-    catch (StudentValidationException ex)
+    catch (PipelineException ex) when (!ex.IsFullyCompensated)
     {
-        return Results.ValidationProblem(new Dictionary<string, string[]> { ["request"] = ex.Errors.ToArray() });
+        // The rollback is incomplete, so the system may be left inconsistent whatever the original cause was.
+        return Results.Problem(statusCode: StatusCodes.Status500InternalServerError);
     }
-    catch (DuplicateIdentificationNumberException ex)
+    catch (PipelineException ex) when (ex.OriginalException is StudentValidationException validation)
     {
-        return Results.Conflict(new { ex.Message });
+        return Results.ValidationProblem(new Dictionary<string, string[]> { ["request"] = validation.Errors.ToArray() });
     }
-    catch (ProgramNotFoundException ex)
+    catch (PipelineException ex) when (ex.OriginalException is DuplicateIdentificationNumberException duplicate)
     {
-        return Results.NotFound(new { ex.Message });
+        return Results.Conflict(new { duplicate.Message });
+    }
+    catch (PipelineException ex) when (ex.OriginalException is ProgramNotFoundException notFound)
+    {
+        return Results.NotFound(new { notFound.Message });
     }
 })
 .WithName("RegisterStudent");

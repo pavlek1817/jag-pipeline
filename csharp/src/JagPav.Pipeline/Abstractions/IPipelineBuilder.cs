@@ -1,3 +1,5 @@
+using JagPav.Pipeline.Exceptions;
+
 namespace JagPav.Pipeline.Abstractions;
 
 /// <summary>
@@ -25,11 +27,14 @@ public interface IPipelineBuilder<TModel>
 
     /// <summary>
     /// Registers a final action that runs once when the pipeline fails, after the compensations and before
-    /// the original exception is re-thrown to the caller. Only one failure action can be registered.
+    /// the <see cref="PipelineException"/> is thrown to the caller. Only one failure action can be registered.
     /// It is not a replacement for a compensating action: undoing a step belongs in <see cref="AddCompensableStep"/>.
     /// </summary>
-    /// <param name="onFailureAsync">The action to run, given the model and the exception that failed the pipeline.</param>
-    IPipelineBuilder<TModel> OnFailure(Func<TModel, Exception, CancellationToken, Task> onFailureAsync);
+    /// <param name="onFailureAsync">
+    /// The action to run, given the model and the same <see cref="PipelineException"/> the caller receives: the
+    /// original exception and the outcome of the compensations.
+    /// </param>
+    IPipelineBuilder<TModel> OnFailure(Func<TModel, PipelineException, CancellationToken, Task> onFailureAsync);
 
     /// <summary>
     /// Builds the pipeline from the registered steps. Can be called only once; a second call throws

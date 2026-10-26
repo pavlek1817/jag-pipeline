@@ -1,4 +1,5 @@
 using JagPav.Pipeline.Abstractions;
+using JagPav.Pipeline.Exceptions;
 
 namespace JagPav.Pipeline.Core;
 
@@ -10,8 +11,26 @@ public sealed class PipelineBuilder<TModel> : IPipelineBuilder<TModel>
     where TModel : class
 {
     private readonly List<StepDefinition<TModel>> steps = new List<StepDefinition<TModel>>();
-    private Func<TModel, Exception, CancellationToken, Task>? onFailureAsync;
+    private readonly CompensationStrategy compensationStrategy;
+    private Func<TModel, PipelineException, CancellationToken, Task>? onFailureAsync;
     private bool isBuilt;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="PipelineBuilder{TModel}"/> class.
+    /// </summary>
+    /// <param name="compensationStrategy">What the pipeline does when a compensating action fails.</param>
+    public PipelineBuilder(CompensationStrategy compensationStrategy = CompensationStrategy.ContinueOnFailure)
+    {
+        if (!Enum.IsDefined(compensationStrategy))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(compensationStrategy),
+                compensationStrategy,
+                "Unknown compensation strategy.");
+        }
+
+        this.compensationStrategy = compensationStrategy;
+    }
 
     public IPipelineBuilder<TModel> AddCompensableStep(
         Func<TModel, CancellationToken, Task<TModel>> executeAsync,
@@ -19,7 +38,7 @@ public sealed class PipelineBuilder<TModel> : IPipelineBuilder<TModel>
     {
         ArgumentNullException.ThrowIfNull(executeAsync);
         this.ensureNotBuilt();
-        this.steps.Add(new StepDefinition<TModel>(executeAsync, compensateAsync));
+        this.steps.Add(new StepDefinition<TModel>(this.steps.Count, executeAsync, compensateAsync));
         return this;
     }
 
@@ -28,7 +47,7 @@ public sealed class PipelineBuilder<TModel> : IPipelineBuilder<TModel>
         return this.AddCompensableStep(executeAsync, null);
     }
 
-    public IPipelineBuilder<TModel> OnFailure(Func<TModel, Exception, CancellationToken, Task> onFailureAsync)
+    public IPipelineBuilder<TModel> OnFailure(Func<TModel, PipelineException, CancellationToken, Task> onFailureAsync)
     {
         ArgumentNullException.ThrowIfNull(onFailureAsync);
         this.ensureNotBuilt();
@@ -53,7 +72,7 @@ public sealed class PipelineBuilder<TModel> : IPipelineBuilder<TModel>
             throw new InvalidOperationException("At least one step must be added before calling Build().");
         }
 
-        var pipeline = new Pipeline<TModel>(this.steps.ToList(), this.onFailureAsync);
+        var pipeline = new Pipeline<TModel>(this.steps.ToList(), this.onFailureAsync, this.compensationStrategy);
         this.isBuilt = true;
         return pipeline;
     }

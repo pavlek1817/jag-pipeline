@@ -1,3 +1,5 @@
+using JagPav.Pipeline.Exceptions;
+
 namespace JagPav.Pipeline.Abstractions;
 
 /// <summary>
@@ -11,11 +13,12 @@ public interface IPipeline<TModel>
 {
     /// <summary>
     /// Runs the model through all registered steps in order.
-    /// On failure, compensates all completed steps in reverse order, runs the failure action registered with
-    /// <see cref="IPipelineBuilder{TModel}.OnFailure"/>, and re-throws the original exception. If a compensation or
-    /// the failure action throws as well, the original exception is still the one re-thrown; the others are added to
-    /// the returned task's <see cref="Task.Exception"/>.
+    /// On failure, compensates all completed steps in reverse order (following the builder's compensation strategy),
+    /// runs the failure action registered with <see cref="IPipelineBuilder{TModel}.OnFailure"/>, and throws a
+    /// <see cref="PipelineException"/>. Its <see cref="PipelineException.OriginalException"/> is the step's exception;
+    /// failed compensations and a failed failure action are reported on it as well.
     /// </summary>
+    /// <exception cref="PipelineException">A step failed.</exception>
     /// <param name="model">The model to process.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The processed model.</returns>
